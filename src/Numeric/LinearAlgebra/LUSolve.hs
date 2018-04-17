@@ -20,43 +20,55 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 -- a vector containing the location of the nonzero column) that describes
 -- the row interchanges (partial pivoting).
 --
+-- To maintain the expected Haskell API, i.e., an immutable input matrix,
+-- the first thing to do is to copy the original immutable
+-- matrix into a mutable one.  The LU factorization runs efficiently in place
+-- using a mutable matrix. At the end of the calculation, the
+-- matrix will be frozen (i.e., made immutable again).
+--
 luFactor :: M.Matrix V.Vector Double -> (M.Matrix V.Vector Double, V.Vector Int)
 luFactor aOrig = runST $ do
-    -- the first thing to do is to copy the original immutable
-    -- matrix into a mutable one, since the LU factorization runs
-    -- efficiently in place. At the end of the calculation, the
-    -- matrix will be frozen (i.e., marked as immutable again).
 
     let
-        (nr, nc) = M.dim aOrig
+        (m, n) = M.dim aOrig
 
-    a <- M.thaw aOrig
-    p <- V.unsafeThaw $ V.generate nr id  -- initialize the permutation vector
-                                          -- to the identity, [0,1,2,...,(nr - 1)]
+    a      <- M.thaw aOrig
+    pivots <- V.unsafeThaw $ V.generate m id  -- initialize the pivot vector
+                                              -- to the identity, [0,1,2,...,(nr - 1)]
+    luFactor_ a pivots
 
-    --luFactor_ a 0 (nr - 1) 0 (nc - 1) p
+    if m >= n
+       then do return ()
+       else do
+        rowSwap (subMatrix (0, 0) (1, 1) a) pivots
+        triangularSolve a undefined undefined
 
-    a' <- M.unsafeFreeze a
-    p' <- V.unsafeFreeze p
+    a'      <- M.unsafeFreeze a
+    pivots' <- V.unsafeFreeze pivots
 
-    return (a', p')
+    return (a', pivots')
 
 
 luFactor_ :: MU.MMatrix VU.MVector s Double
-          -> Int
-          -> Int
-          -> Int
-          -> Int
-          -> VU.MVector s Int -> ST s ()
-luFactor_ a rl rh cl ch p = do
-    luFactor_ a rl rh cl ch p
-    rowSwap a 1 2 undefined Up
-    triangularSolve a undefined undefined
-    matrixMultiply 1.0 (subMatrix (0,0) (1,1) a)
-                       (subMatrix (0,0) (1,1) a)
-                   1.0 (subMatrix (0,0) (1,1) a)
-    luFactor_ a rl rh cl ch p
-    rowSwap a 1 2 undefined Up
+          -> VU.MVector s Int
+          -> ST s ()
+luFactor_ a pivots = do
+    let
+        (m, n) = MU.dim a
+        mnMin  = min m n
+        p      = mnMin `div` 2
+
+    if mnMin == 1
+       then undefined
+       else do
+        luFactor_ (subMatrix (0, 0) (p - 1, p - 1) a) pivots
+        rowSwap   (subMatrix (0, p) (p - 1, n - 1) a) pivots
+        triangularSolve a undefined undefined
+        matrixMultiply 1.0 (subMatrix (0,0) (1,1) a)
+                           (subMatrix (0,0) (1,1) a)
+                       1.0 (subMatrix (0,0) (1,1) a)
+        luFactor_ (subMatrix (p, p) (m - 1, n - 1) a) pivots
+        rowSwap   (subMatrix (p, 0) (m - 1, p - 1) a) pivots
 
 
 -- This is a generic mutable matrix multiply.  The mutable references
@@ -154,7 +166,7 @@ testSwap m p = runST $ do
      m' <- M.thaw m
      p' <- V.thaw p
      let ms = subMatrix (1, 1) (2, 2) m'
-     rowSwap ms 0 1 p' Up
+     rowSwap ms p'
      m'' <- M.unsafeFreeze ms
      return m''
 
@@ -175,14 +187,13 @@ data Direction = Up | Down deriving (Eq, Read, Show)
 -- index indicates a row that was not swapped.
 --
 rowSwap :: MU.MMatrix VU.MVector s Double
-        -> Int
-        -> Int
         -> VU.MVector s Int
-        -> Direction
         -> ST s ()
-rowSwap a firstPivot lastPivot pivots _ = do
+rowSwap a pivots = do
     let
         (nr, nc) = MU.dim a
+        firstPivot = undefined
+        lastPivot  = undefined
 
     if nr /= VU.length pivots
        then error "length of pivot vector must equal number of rows"
