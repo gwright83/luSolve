@@ -26,22 +26,29 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 -- using a mutable matrix. At the end of the calculation, the
 -- matrix will be frozen (i.e., made immutable again).
 --
+-- The factorization takes place in eiher two steps or a single step.
+-- If the number of rows of aOrig (m) is less than the number of columns (n),
+-- the m * m square matrix is factored first, then the remaining m * (n - m) piece.
+-- The the number of rows is greater than or equal to the number of columns,
+-- one invocation of luFactor_ is all that is needed.
+--
 luFactor :: M.Matrix V.Vector Double -> (M.Matrix V.Vector Double, V.Vector Int)
 luFactor aOrig = runST $ do
-
     let
         (m, n) = M.dim aOrig
+        mnMin  = min m n
 
     a      <- M.thaw aOrig
     pivots <- V.unsafeThaw $ V.generate m id  -- initialize the pivot vector
                                               -- to the identity, [0,1,2,...,(nr - 1)]
-    luFactor_ a pivots
+    luFactor_ (subMatrix (0, 0) (mnMin, mnMin) a) pivots
 
     if m >= n
        then do return ()
        else do
-        rowSwap (subMatrix (0, 0) (1, 1) a) pivots
-        triangularSolve a undefined undefined
+        rowSwap (subMatrix (0, m) (n - 1, m - 1) a) pivots
+        triangularSolve (subMatrix (0, 0) (mnMin, mnMin) a)
+                        (subMatrix (0, m) (n - 1, m - 1) a)
 
     a'      <- M.unsafeFreeze a
     pivots' <- V.unsafeFreeze pivots
@@ -63,7 +70,7 @@ luFactor_ a pivots = do
        else do
         luFactor_ (subMatrix (0, 0) (p - 1, p - 1) a) pivots
         rowSwap   (subMatrix (0, p) (p - 1, n - 1) a) pivots
-        triangularSolve a undefined undefined
+        triangularSolve a undefined
         matrixMultiply 1.0 (subMatrix (0,0) (1,1) a)
                            (subMatrix (0,0) (1,1) a)
                        1.0 (subMatrix (0,0) (1,1) a)
@@ -171,7 +178,6 @@ testSwap m p = runST $ do
      return m''
 
 
-
 data Direction = Up | Down deriving (Eq, Read, Show)
 
 -- rowSwap swaps two rows.  Note that the pivot vector is not
@@ -208,11 +214,26 @@ rowSwap a pivots = do
                else return ()
 
 
+-- TriangularSolve solves the linear system AX = B when A is upper
+-- triangular.  The matrix B is overwritten, column by column, by
+-- the solution matrix X.
+--
 triangularSolve :: MU.MMatrix VU.MVector s Double
-                -> VU.MVector s Double
-                -> VU.MVector s Double
+                -> MU.MMatrix VU.MVector s Double
                 -> ST s ()
-triangularSolve a b x = undefined
+triangularSolve a b = do
+    let
+        (m, n) = MU.dim b
+
+    numLoop 0 (n - 1) $ \j ->
+      numLoop 0 (m - 1) $ \k -> do
+        bkj <- MU.unsafeRead b (k, j)
+        if bkj == 0
+           then return ()
+           else numLoop k (m - 1) $ \i -> do
+            bij <- MU.unsafeRead b (i, j)
+            aik <- MU.unsafeRead a (i, k)
+            MU.unsafeWrite b (i, j) (bij - bkj * aik)
 
 
 -- Solve the system of equations Ax = b, given A as a packed LU decomposition
