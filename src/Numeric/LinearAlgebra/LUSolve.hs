@@ -41,14 +41,19 @@ luFactor aOrig = runST $ do
     a      <- M.thaw aOrig
     pivots <- V.unsafeThaw $ V.generate m id  -- initialize the pivot vector
                                               -- to the identity, [0,1,2,...,(nr - 1)]
-    luFactor_ (subMatrix (0, 0) (mnMin, mnMin) a) pivots
+    let
+        a' = subMatrix (0, 0) (mnMin - 1, mnMin - 1) a
+
+    luFactor_ a' pivots
 
     if m >= n
        then do return ()
        else do
-        rowSwap (subMatrix (0, m) (n - 1, m - 1) a) pivots
-        triangularSolve (subMatrix (0, 0) (mnMin, mnMin) a)
-                        (subMatrix (0, m) (n - 1, m - 1) a)
+        let
+            aLeft  = subMatrix (0, 0) (m - 1, m - 1) a
+            aRight = subMatrix (0, m) (m - 1, n - 1) a
+        rowSwap aRight pivots
+        triangularSolve aLeft aRight
 
     a'      <- M.unsafeFreeze a
     pivots' <- V.unsafeFreeze pivots
