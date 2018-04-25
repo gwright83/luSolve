@@ -12,7 +12,7 @@ import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
 import qualified Data.Vector.Unboxed               as V
 import qualified Data.Vector.Unboxed.Mutable       as VU
-
+import Debug.Trace
 
 
 -- Factor a rectangular matrix A into PA = LU, where L is lower triangular,
@@ -63,19 +63,30 @@ luFactor_ a pivots = do
     let
         (m, n) = MU.dim a
         mnMin  = min m n
-        p      = mnMin `div` 2
+        n'     = mnMin `div` 2
 
     if mnMin == 1
-       then undefined
+       then pivotAndScale a pivots
        else do
-        luFactor_ (subMatrix (0, 0) (p - 1, p - 1) a) pivots
-        rowSwap   (subMatrix (0, p) (p - 1, n - 1) a) pivots
-        triangularSolve a undefined
-        matrixMultiply 1.0 (subMatrix (0,0) (1,1) a)
-                           (subMatrix (0,0) (1,1) a)
-                       1.0 (subMatrix (0,0) (1,1) a)
-        luFactor_ (subMatrix (p, p) (m - 1, n - 1) a) pivots
-        rowSwap   (subMatrix (p, 0) (m - 1, p - 1) a) pivots
+        let
+            aLeft  = subMatrix (0, 0)  (n - 1, n' - 1) a
+            aRight = subMatrix (0, n') (n - 1, n  - 1) a
+
+            aTopLeft     = subMatrix (0,  0)  (n' - 1, n' - 1) a
+            aTopRight    = subMatrix (0,  n') (n' - 1, n  - 1) a
+            aBottomLeft  = subMatrix (n', 0)  (n  - 1, n' - 1) a
+            aBottomRight = subMatrix (n', n') (n  - 1, n  - 1) a
+
+            pivotsTop    = VU.slice 0       n'  pivots
+            pivotsBottom = VU.slice n' (n - n') pivots
+
+        luFactor_ aLeft  pivotsTop
+        rowSwap   aRight pivotsTop
+        triangularSolve aTopLeft  aTopRight
+        matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
+        luFactor_ aBottomRight pivotsBottom
+        rowSwap   aBottomLeft  pivotsBottom
+        adjustPivots pivotsBottom n'
 
 
 -- This is a generic mutable matrix multiply.  The mutable references
@@ -178,8 +189,6 @@ testSwap m p = runST $ do
      return m''
 
 
-data Direction = Up | Down deriving (Eq, Read, Show)
-
 -- rowSwap swaps two rows.  Note that the pivot vector is not
 -- arranged as a permutation vector (i.e., the entry at index
 -- i corresponding to the row swapped with i), but in NAG pivot
@@ -197,21 +206,55 @@ rowSwap :: MU.MMatrix VU.MVector s Double
         -> ST s ()
 rowSwap a pivots = do
     let
-        (nr, nc) = MU.dim a
-        firstPivot = undefined
-        lastPivot  = undefined
+        (_, nc) = MU.dim a
+        nPivots = VU.length pivots
 
-    if nr /= VU.length pivots
-       then error "length of pivot vector must equal number of rows"
-       else numLoop firstPivot lastPivot $ \i -> do
-            ip <- VU.unsafeRead pivots i
-            if ip /= i
-               then numLoop 0 (nc - 1) $ \k -> do
-                  temp <- MU.unsafeRead a (i,  k)
-                  aipk <- MU.unsafeRead a (ip, k)
-                  MU.unsafeWrite a (i,  k) aipk
-                  MU.unsafeWrite a (ip, k) temp
-               else return ()
+    numLoop 0 nPivots $ \i -> do
+        ip <- VU.unsafeRead pivots i
+        if ip /= i
+           then numLoop 0 (nc - 1) $ \k -> do
+              let
+                  i'  = i
+                  ip' = ip
+              temp <- MU.unsafeRead a (i',  k)
+              aipk <- MU.unsafeRead a (ip', k)
+              MU.unsafeWrite a (i',  k) aipk
+              MU.unsafeWrite a (ip', k) temp
+            else return ()
+
+
+pivotAndScale :: MU.MMatrix VU.MVector s Double
+              -> VU.MVector s Int
+              -> ST s ()
+pivotAndScale a pivots = do
+    ip   <- findPivot a
+    temp <- MU.unsafeRead a (0,  0)
+    aip  <- MU.unsafeRead a (ip, 0)
+    MU.unsafeWrite a (0,  0) aip
+    MU.unsafeWrite a (ip, 0) temp
+
+    let
+        (nr, _) = MU.dim a
+
+    numLoop 1 (nr - 1) $ \k -> do
+      ak <- MU.unsafeRead a (k, 0)
+      MU.unsafeWrite a (k, 0) (ak / aip)
+
+
+-- Given a pivot vector, add a constant to each element.
+-- This is used to shift the pivot vector entries from referring
+-- to the local submatrix to the global matrix.
+--
+adjustPivots :: VU.MVector s Int
+             -> Int
+             -> ST s ()
+adjustPivots pivots offset = do
+    let
+        nPivots = VU.length pivots
+
+    numLoop 0 nPivots $ \i -> do
+        ip <- VU.unsafeRead pivots i
+        VU.unsafeWrite pivots i (ip + offset)
 
 
 -- TriangularSolve solves the linear system AX = B when A is upper
@@ -234,6 +277,36 @@ triangularSolve a b = do
             bij <- MU.unsafeRead b (i, j)
             aik <- MU.unsafeRead a (i, k)
             MU.unsafeWrite b (i, j) (bij - bkj * aik)
+
+
+-- Should be correct, but still needs to be tested.
+--
+findPivot :: MU.MMatrix VU.MVector s Double -> ST s Int
+findPivot m = do
+    let
+        (nr, _) = MU.dim m
+
+        go aval k idx = do
+        if k >= nr
+           then return idx
+           else do
+            v <- MU.unsafeRead m (k, 0)
+            if aval < abs v
+               then go (abs v) (k + 1) k
+               else go  aval   (k + 1) idx
+
+    val <- MU.unsafeRead m (0, 0)
+    piv <- go (abs val) 1 0
+    return piv
+
+
+-- Given a (sub)matrix, evaluate the row index of the first row.
+-- For the parent matrix, this is always zero.  For a matrix which is
+-- a submatrix, this the row index of the zeroth row of the submatrix
+-- within the parent matrix.
+--
+rowBase :: MU.MMatrix VU.MVector s Double -> Int
+rowBase (MU.MMatrix  _ _ tda offset _) = offset `div` tda
 
 
 -- Solve the system of equations Ax = b, given A as a packed LU decomposition
