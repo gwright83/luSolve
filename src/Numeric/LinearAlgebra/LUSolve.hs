@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 --
 -- LUSolve.hs
 --
@@ -8,6 +9,7 @@ module Numeric.LinearAlgebra.LUSolve where
 
 import           Control.Loop                      (numLoop, numLoopState)
 import           Control.Monad.ST                  (ST, runST)
+import Control.Monad.ST.Unsafe (unsafeIOToST)
 import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
 import qualified Data.Vector.Unboxed               as V
@@ -39,10 +41,10 @@ luFactor aOrig = runST $ do
         mnMin  = min m n
 
     a      <- M.thaw aOrig
-    pivots <- V.unsafeThaw $ V.generate m id  -- initialize the pivot vector
-                                              -- to the identity, [0,1,2,...,(nr - 1)]
+    pivots <- VU.new m
+
     let
-        a' = subMatrix (0, 0) (mnMin - 1, mnMin - 1) a
+        a' = subMatrix (0, 0) (m - 1, mnMin - 1) a
 
     luFactor_ a' pivots
 
@@ -70,6 +72,9 @@ luFactor_ a pivots = do
         mnMin  = min m n
         n'     = mnMin `div` 2
 
+    mPeek a
+    vPeek pivots
+
     if mnMin == 1
        then pivotAndScale a pivots
        else do
@@ -92,6 +97,28 @@ luFactor_ a pivots = do
         luFactor_ aBottomRight pivotsBottom
         rowSwap   aBottomLeft  pivotsBottom
         adjustPivots pivotsBottom n'
+
+
+mPeek :: MU.MMatrix VU.MVector s Double -> ST s ()
+mPeek a = do
+    let
+        (m, n) = MU.dim a
+    numLoop 0 (m - 1) $ \i -> do
+      unsafeIOToST (putStr "\n")
+      numLoop 0 (n - 1) $ \j -> do
+        aij <- MU.unsafeRead a (i, j)
+        unsafeIOToST (putStr ((show aij) ++ "  "))
+    unsafeIOToST (putStr "\n")
+
+
+vPeek :: VU.MVector s Int -> ST s ()
+vPeek v = do
+    let
+        n = VU.length v
+    unsafeIOToST (putStr "\n")
+    numLoop 0 (n - 1) $ \i -> do
+        vi <- VU.unsafeRead v i
+        unsafeIOToST (putStrLn (show vi))
 
 
 -- This is a generic mutable matrix multiply.  The mutable references
@@ -305,15 +332,6 @@ findPivot m = do
     return piv
 
 
--- Given a (sub)matrix, evaluate the row index of the first row.
--- For the parent matrix, this is always zero.  For a matrix which is
--- a submatrix, this the row index of the zeroth row of the submatrix
--- within the parent matrix.
---
-rowBase :: MU.MMatrix VU.MVector s Double -> Int
-rowBase (MU.MMatrix  _ _ tda offset _) = offset `div` tda
-
-
 -- Solve the system of equations Ax = b, given A as a packed LU decomposition
 -- and a row permutation vector.
 --
@@ -329,17 +347,10 @@ luSolve :: (M.Matrix V.Vector Double,    -- matrix A, as a packed LU decompositi
 luSolve (a, perm) b = runST $ do undefined
 
 
+testMat = M.fromLists [[0.772386, 0.499327, 0.189312],
+                       [0.759731, 0.799350, 0.682719],
+                       [0.456574, 0.636521, 0.003035],
+                       [0.014020, 0.636044, 0.990054]]
 
--- multStd__ :: Num a => Matrix a -> Matrix a -> Matrix a
--- {-# INLINE multStd__ #-}
--- multStd__ a b = matrix r c $ \(i,j) -> dotProduct (V.unsafeIndex avs $ i - 1) (V.unsafeIndex bvs $ j - 1)
---   where
---     r = nrows a
---     avs = V.generate r $ \i -> getRow (i+1) a
---     c = ncols b
---     bvs = V.generate c $ \i -> getCol (i+1) b
-
--- dotProduct :: Num a => V.Vector a -> V.Vector a -> a
--- {-# INLINE dotProduct #-}
--- dotProduct v1 v2 = numLoopFold 0 (V.length v1 - 1) 0 $
---   \r i -> V.unsafeIndex v1 i * V.unsafeIndex v2 i + r
+test :: (M.Matrix V.Vector Double, V.Vector Int)
+test = luFactor testMat
