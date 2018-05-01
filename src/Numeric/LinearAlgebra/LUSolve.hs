@@ -57,6 +57,7 @@ luFactor aOrig = runST $ do
         rowSwap aRight pivots
         triangularSolve aLeft aRight
 
+    mPeek a
     a'      <- M.unsafeFreeze a
     pivots' <- V.unsafeFreeze pivots
 
@@ -73,19 +74,20 @@ luFactor_ a pivots = do
         n'     = mnMin `div` 2
 
     mPeek a
+    --mvPeek a
     vPeek pivots
 
     if mnMin == 1
        then pivotAndScale a pivots
        else do
         let
-            aLeft  = subMatrix (0, 0)  (n - 1, n' - 1) a
-            aRight = subMatrix (0, n') (n - 1, n  - 1) a
+            aLeft  = subMatrix (0, 0)  (m - 1, n' - 1) a
+            aRight = subMatrix (0, n') (m - 1, n  - 1) a
 
             aTopLeft     = subMatrix (0,  0)  (n' - 1, n' - 1) a
             aTopRight    = subMatrix (0,  n') (n' - 1, n  - 1) a
-            aBottomLeft  = subMatrix (n', 0)  (n  - 1, n' - 1) a
-            aBottomRight = subMatrix (n', n') (n  - 1, n  - 1) a
+            aBottomLeft  = subMatrix (n', 0)  (m  - 1, n' - 1) a
+            aBottomRight = subMatrix (n', n') (m  - 1, n  - 1) a
 
             pivotsTop    = VU.slice 0       n'  pivots
             pivotsBottom = VU.slice n' (n - n') pivots
@@ -109,6 +111,16 @@ mPeek a = do
         aij <- MU.unsafeRead a (i, j)
         unsafeIOToST (putStr ((show aij) ++ "  "))
     unsafeIOToST (putStr "\n")
+
+
+mvPeek :: MU.MMatrix VU.MVector s Double -> ST s ()
+mvPeek (MU.MMatrix _ _ _ _ v)  = do
+    let
+        n = VU.length v
+    unsafeIOToST (putStr "\n")
+    numLoop 0 (n - 1) $ \i -> do
+        vi <- VU.unsafeRead v i
+        unsafeIOToST (putStrLn (show vi))
 
 
 vPeek :: VU.MVector s Int -> ST s ()
@@ -221,6 +233,18 @@ testSwap m p = runST $ do
      return m''
 
 
+testPivotAndScale :: M.Matrix V.Vector Double
+                  -> V.Vector Int
+                  -> (M.Matrix V.Vector Double, V.Vector Int)
+testPivotAndScale m p = runST $ do
+     m' <- M.thaw m
+     p' <- V.thaw p
+     pivotAndScale m' p'
+     m'' <- M.unsafeFreeze m'
+     p'' <- V.unsafeFreeze p'
+     return (m'', p'')
+
+
 -- rowSwap swaps two rows.  Note that the pivot vector is not
 -- arranged as a permutation vector (i.e., the entry at index
 -- i corresponding to the row swapped with i), but in NAG pivot
@@ -264,6 +288,7 @@ pivotAndScale a pivots = do
     aip  <- MU.unsafeRead a (ip, 0)
     MU.unsafeWrite a (0,  0) aip
     MU.unsafeWrite a (ip, 0) temp
+    VU.unsafeWrite pivots 0 ip
 
     let
         (nr, _) = MU.dim a
