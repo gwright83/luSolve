@@ -108,7 +108,15 @@ luFactor_ a pivots = do
         triangularSolve aTopLeft  aTopRight
         matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
         luFactor_ aBottomRight pivotsBottom
+
+        mPeek "aBottomLeft: " aBottomLeft
+        vPeek pivotsBottom
+
         rowSwap   aBottomLeft  pivotsBottom
+
+        mPeek "aBottomLeft': " aBottomLeft
+        vPeek pivotsBottom
+
         adjustPivots pivotsBottom n'
 
 
@@ -331,7 +339,7 @@ adjustPivots pivots offset = do
     let
         nPivots = VU.length pivots
 
-    numLoop 0 nPivots $ \i -> do
+    numLoop 0 (nPivots - 1) $ \i -> do
         ip <- VU.unsafeRead pivots i
         VU.unsafeWrite pivots i (ip + offset)
 
