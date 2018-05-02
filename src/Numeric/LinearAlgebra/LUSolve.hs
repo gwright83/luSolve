@@ -57,7 +57,7 @@ luFactor aOrig = runST $ do
         rowSwap aRight pivots
         triangularSolve aLeft aRight
 
-    mPeek a
+    mPeek "a: " a
     a'      <- M.unsafeFreeze a
     pivots' <- V.unsafeFreeze pivots
 
@@ -70,46 +70,55 @@ luFactor_ :: MU.MMatrix VU.MVector s Double
 luFactor_ a pivots = do
     let
         (m, n) = MU.dim a
-        mnMin  = min m n
-        n'     = mnMin `div` 2
+        n'     = n `div` 2
 
-    mPeek a
+        mm1  = m  - 1
+        nm1  = n  - 1
+        npm1 = n' - 1
+
+    --mPeek a
     --mvPeek a
-    vPeek pivots
+    --vPeek pivots
 
-    if mnMin == 1
+    if n == 1
        then pivotAndScale a pivots
        else do
         let
-            aLeft  = subMatrix (0, 0)  (m - 1, n' - 1) a
-            aRight = subMatrix (0, n') (m - 1, n  - 1) a
+            aLeft  = subMatrix (0, 0)  (mm1, npm1) a
+            aRight = subMatrix (0, n') (mm1, nm1)  a
 
             aTopLeft     = subMatrix (0,  0)  (n' - 1, n' - 1) a
             aTopRight    = subMatrix (0,  n') (n' - 1, n  - 1) a
             aBottomLeft  = subMatrix (n', 0)  (m  - 1, n' - 1) a
             aBottomRight = subMatrix (n', n') (m  - 1, n  - 1) a
 
-            pivotsTop    = VU.slice 0       n'  pivots
-            pivotsBottom = VU.slice n' (n - n') pivots
+            pivotsTop    = VU.unsafeSlice 0       n'  pivots
+            pivotsBottom = VU.unsafeSlice n' (n - n') pivots
+
+        mPeek "aTopLeft: " aTopLeft
+        mPeek "aTopRight: " aTopRight
 
         luFactor_ aLeft  pivotsTop
         rowSwap   aRight pivotsTop
         triangularSolve aTopLeft  aTopRight
+
+        mPeek "aTopRight: " aTopRight
+
         matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
         luFactor_ aBottomRight pivotsBottom
         rowSwap   aBottomLeft  pivotsBottom
         adjustPivots pivotsBottom n'
 
 
-mPeek :: MU.MMatrix VU.MVector s Double -> ST s ()
-mPeek a = do
+mPeek :: String -> MU.MMatrix VU.MVector s Double -> ST s ()
+mPeek str a = do
     let
         (m, n) = MU.dim a
     numLoop 0 (m - 1) $ \i -> do
       unsafeIOToST (putStr "\n")
       numLoop 0 (n - 1) $ \j -> do
         aij <- MU.unsafeRead a (i, j)
-        unsafeIOToST (putStr ((show aij) ++ "  "))
+        unsafeIOToST (putStr (str ++ (show aij) ++ "  "))
     unsafeIOToST (putStr "\n")
 
 
@@ -245,6 +254,17 @@ testPivotAndScale m p = runST $ do
      return (m'', p'')
 
 
+testTriangularSolve :: M.Matrix V.Vector Double
+                    -> M.Matrix V.Vector Double
+                    -> M.Matrix V.Vector Double
+testTriangularSolve a b = runST $ do
+     a' <- M.thaw a
+     b' <- M.thaw b
+     triangularSolve a' b'
+     b'' <- M.unsafeFreeze b'
+     return b''
+
+
 -- rowSwap swaps two rows.  Note that the pivot vector is not
 -- arranged as a permutation vector (i.e., the entry at index
 -- i corresponding to the row swapped with i), but in NAG pivot
@@ -330,7 +350,7 @@ triangularSolve a b = do
         bkj <- MU.unsafeRead b (k, j)
         if bkj == 0
            then return ()
-           else numLoop k (m - 1) $ \i -> do
+           else numLoop (k + 1) (m - 1) $ \i -> do
             bij <- MU.unsafeRead b (i, j)
             aik <- MU.unsafeRead a (i, k)
             MU.unsafeWrite b (i, j) (bij - bkj * aik)
