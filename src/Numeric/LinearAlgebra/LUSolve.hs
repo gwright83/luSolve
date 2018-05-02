@@ -95,15 +95,17 @@ luFactor_ a pivots = do
             pivotsTop    = VU.unsafeSlice 0       n'  pivots
             pivotsBottom = VU.unsafeSlice n' (n - n') pivots
 
-        mPeek "aTopLeft: " aTopLeft
-        mPeek "aTopRight: " aTopRight
-
         luFactor_ aLeft  pivotsTop
+
+        mPeek "aRight: " aRight
+        vPeek pivotsTop
+
         rowSwap   aRight pivotsTop
+
+        mPeek "aRight': " aRight
+        vPeek pivotsTop
+
         triangularSolve aTopLeft  aTopRight
-
-        mPeek "aTopRight: " aTopRight
-
         matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
         luFactor_ aBottomRight pivotsBottom
         rowSwap   aBottomLeft  pivotsBottom
@@ -285,7 +287,7 @@ rowSwap a pivots = do
         (_, nc) = MU.dim a
         nPivots = VU.length pivots
 
-    numLoop 0 nPivots $ \i -> do
+    numLoop 0 (nPivots - 1) $ \i -> do
         ip <- VU.unsafeRead pivots i
         if ip /= i
            then numLoop 0 (nc - 1) $ \k -> do
@@ -296,7 +298,7 @@ rowSwap a pivots = do
               aipk <- MU.unsafeRead a (ip', k)
               MU.unsafeWrite a (i',  k) aipk
               MU.unsafeWrite a (ip', k) temp
-            else return ()
+           else return ()
 
 
 pivotAndScale :: MU.MMatrix VU.MVector s Double
