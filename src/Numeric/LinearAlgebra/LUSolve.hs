@@ -41,7 +41,7 @@ luFactor aOrig = runST $ do
         mnMin  = min m n
 
     a      <- M.thaw aOrig
-    pivots <- VU.new m
+    pivots <- VU.new n
 
     let
         a' = subMatrix (0, 0) (m - 1, mnMin - 1) a
@@ -58,8 +58,8 @@ luFactor aOrig = runST $ do
         triangularSolve aLeft aRight
 
     mPeek "a: " a
-    a'      <- M.unsafeFreeze a
-    pivots' <- V.unsafeFreeze pivots
+    a'      <- M.freeze a
+    pivots' <- V.freeze pivots
 
     return (a', pivots')
 
@@ -76,48 +76,59 @@ luFactor_ a pivots = do
         nm1  = n  - 1
         npm1 = n' - 1
 
-    --mPeek a
+    mPeek "a: " a
     --mvPeek a
-    --vPeek pivots
+    vPeek pivots
 
     if n == 1
-       then pivotAndScale a pivots
+       then do
+            pivotAndScale a pivots
+            return ()
        else do
-        let
-            aLeft  = subMatrix (0, 0)  (mm1, npm1) a
-            aRight = subMatrix (0, n') (mm1, nm1)  a
+            let
 
-            aTopLeft     = subMatrix (0,  0)  (n' - 1, n' - 1) a
-            aTopRight    = subMatrix (0,  n') (n' - 1, n  - 1) a
-            aBottomLeft  = subMatrix (n', 0)  (m  - 1, n' - 1) a
-            aBottomRight = subMatrix (n', n') (m  - 1, n  - 1) a
+               aLeft  = subMatrix (0, 0)  (mm1, npm1) a
+               aRight = subMatrix (0, n') (mm1, nm1)  a
 
-            pivotsTop    = VU.unsafeSlice 0       n'  pivots
-            pivotsBottom = VU.unsafeSlice n' (n - n') pivots
+               aTopLeft     = subMatrix (0,  0)  (npm1, npm1) a
+               aTopRight    = subMatrix (0,  n') (npm1, nm1)  a
+               aBottomLeft  = subMatrix (n', 0)  (mm1,  npm1) a
+               aBottomRight = subMatrix (n', n') (mm1,  nm1)  a
 
-        luFactor_ aLeft  pivotsTop
+               pivotsTop    = VU.slice 0       n'  pivots
+               pivotsBottom = VU.slice n' (n - n') pivots
 
-        mPeek "aRight: " aRight
-        vPeek pivotsTop
+            luFactor_ aLeft  pivotsTop -- was pivotsTop
 
-        rowSwap   aRight pivotsTop
+        --mPeek "aRight: " aRight
+        --vPeek pivotsTop
 
-        mPeek "aRight': " aRight
-        vPeek pivotsTop
+            rowSwap   aRight pivotsTop -- was pivotsTop
 
-        triangularSolve aTopLeft  aTopRight
-        matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
-        luFactor_ aBottomRight pivotsBottom
+            mPeek "aRight': " aRight
+            vPeek pivotsTop
 
-        mPeek "aBottomLeft: " aBottomLeft
-        vPeek pivotsBottom
+            mPeek "aTopRight in: " aTopRight
+            triangularSolve aTopLeft  aTopRight
+            mPeek "aTopRight out: " aTopRight
 
-        rowSwap   aBottomLeft  pivotsBottom
+            mPeek "A_BR: " aBottomRight
+            mPeek "A_BL: " aBottomLeft
+            mPeek "A_TR: " aTopRight
+            matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
+            mPeek "A_BR': " aBottomRight
 
-        mPeek "aBottomLeft': " aBottomLeft
-        vPeek pivotsBottom
+            luFactor_ aBottomRight pivotsBottom
 
-        adjustPivots pivotsBottom n'
+        --mPeek "aBottomLeft: " aBottomLeft
+        --vPeek pivotsBottom
+
+            rowSwap   aBottomLeft  pivotsBottom
+
+        --mPeek "aBottomLeft': " aBottomLeft
+        --vPeek pivotsBottom
+
+            adjustPivots pivotsBottom n'
 
 
 mPeek :: String -> MU.MMatrix VU.MVector s Double -> ST s ()
@@ -127,7 +138,7 @@ mPeek str a = do
     numLoop 0 (m - 1) $ \i -> do
       unsafeIOToST (putStr "\n")
       numLoop 0 (n - 1) $ \j -> do
-        aij <- MU.unsafeRead a (i, j)
+        aij <- MU.read a (i, j)
         unsafeIOToST (putStr (str ++ (show aij) ++ "  "))
     unsafeIOToST (putStr "\n")
 
@@ -138,7 +149,7 @@ mvPeek (MU.MMatrix _ _ _ _ v)  = do
         n = VU.length v
     unsafeIOToST (putStr "\n")
     numLoop 0 (n - 1) $ \i -> do
-        vi <- VU.unsafeRead v i
+        vi <- VU.read v i
         unsafeIOToST (putStrLn (show vi))
 
 
@@ -148,7 +159,7 @@ vPeek v = do
         n = VU.length v
     unsafeIOToST (putStr "\n")
     numLoop 0 (n - 1) $ \i -> do
-        vi <- VU.unsafeRead v i
+        vi <- VU.read v i
         unsafeIOToST (putStrLn (show vi))
 
 
@@ -178,25 +189,25 @@ matrixMultiply alpha a b beta c = do
                 then if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                              MU.unsafeWrite c (i, j) 0
+                              MU.write c (i, j) 0
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                              cij <- MU.unsafeRead c (i, j)
-                              MU.unsafeWrite c (i, j) (beta * cij)
+                              cij <- MU.read c (i, j)
+                              MU.write c (i, j) (beta * cij)
                 else if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j ->
                           numLoop 0 (ca - 1) $ \k -> do
-                              aik <- MU.unsafeRead a (i, k)
-                              bkj <- MU.unsafeRead b (k, j)
-                              MU.unsafeWrite c (i, j) (alpha * aik * bkj)
+                              aik <- MU.read a (i, k)
+                              bkj <- MU.read b (k, j)
+                              MU.write c (i, j) (alpha * aik * bkj)
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                              cij <- MU.unsafeRead c (i, j)
+                              cij <- MU.read c (i, j)
                               numLoop 0 (ca - 1) $ \k -> do
-                                  aik <- MU.unsafeRead a (i, k)
-                                  bkj <- MU.unsafeRead b (k, j)
-                                  MU.unsafeWrite c (i, j) (alpha * aik * bkj + beta * cij)
+                                  aik <- MU.read a (i, k)
+                                  bkj <- MU.read b (k, j)
+                                  MU.write c (i, j) (alpha * aik * bkj + beta * cij)
         else error "incompatible dimensions"
 
 
@@ -218,8 +229,8 @@ subMatrix (i,j) (i',j') (MU.MMatrix _ n tda offset vec)
 dotProduct :: (Num a, VU.Unbox a) => VU.MVector s a -> VU.MVector s a -> ST s a
 {-# INLINE dotProduct #-}
 dotProduct v1 v2 = numLoopState 0 (VU.length v1 - 1) 0 $ \acc i -> do
-    v1' <- VU.unsafeRead v1 i
-    v2' <- VU.unsafeRead v2 i
+    v1' <- VU.read v1 i
+    v2' <- VU.read v2 i
     return $ v1' * v2' + acc
 
 
@@ -296,16 +307,16 @@ rowSwap a pivots = do
         nPivots = VU.length pivots
 
     numLoop 0 (nPivots - 1) $ \i -> do
-        ip <- VU.unsafeRead pivots i
+        ip <- VU.read pivots i
         if ip /= i
            then numLoop 0 (nc - 1) $ \k -> do
               let
                   i'  = i
                   ip' = ip
-              temp <- MU.unsafeRead a (i',  k)
-              aipk <- MU.unsafeRead a (ip', k)
-              MU.unsafeWrite a (i',  k) aipk
-              MU.unsafeWrite a (ip', k) temp
+              temp <- MU.read a (i',  k)
+              aipk <- MU.read a (ip', k)
+              MU.write a (i',  k) aipk
+              MU.write a (ip', k) temp
            else return ()
 
 
@@ -314,18 +325,19 @@ pivotAndScale :: MU.MMatrix VU.MVector s Double
               -> ST s ()
 pivotAndScale a pivots = do
     ip   <- findPivot a
-    temp <- MU.unsafeRead a (0,  0)
-    aip  <- MU.unsafeRead a (ip, 0)
-    MU.unsafeWrite a (0,  0) aip
-    MU.unsafeWrite a (ip, 0) temp
-    VU.unsafeWrite pivots 0 ip
+    temp <- MU.read a (0,  0)
+    aip  <- MU.read a (ip, 0)
+    MU.write a (0,  0) aip
+    MU.write a (ip, 0) temp
+    VU.write pivots 0 ip
 
+    -- Scale the elememts below the first.
     let
         (nr, _) = MU.dim a
 
     numLoop 1 (nr - 1) $ \k -> do
-      ak <- MU.unsafeRead a (k, 0)
-      MU.unsafeWrite a (k, 0) (ak / aip)
+      ak <- MU.read a (k, 0)
+      MU.write a (k, 0) (ak / aip)
 
 
 -- Given a pivot vector, add a constant to each element.
@@ -340,8 +352,8 @@ adjustPivots pivots offset = do
         nPivots = VU.length pivots
 
     numLoop 0 (nPivots - 1) $ \i -> do
-        ip <- VU.unsafeRead pivots i
-        VU.unsafeWrite pivots i (ip + offset)
+        ip <- VU.read pivots i
+        VU.write pivots i (ip + offset)
 
 
 -- TriangularSolve solves the linear system AX = B when A is upper
@@ -353,17 +365,18 @@ triangularSolve :: MU.MMatrix VU.MVector s Double
                 -> ST s ()
 triangularSolve a b = do
     let
-        (m, n) = MU.dim b
+        (_, m) = MU.dim a
+        (_, n) = MU.dim b
 
     numLoop 0 (n - 1) $ \j ->
       numLoop 0 (m - 1) $ \k -> do
-        bkj <- MU.unsafeRead b (k, j)
+        bkj <- MU.read b (k, j)
         if bkj == 0
            then return ()
            else numLoop (k + 1) (m - 1) $ \i -> do
-            bij <- MU.unsafeRead b (i, j)
-            aik <- MU.unsafeRead a (i, k)
-            MU.unsafeWrite b (i, j) (bij - bkj * aik)
+            bij <- MU.read b (i, j)
+            aik <- MU.read a (i, k)
+            MU.write b (i, j) (bij - bkj * aik)
 
 
 -- Should be correct, but still needs to be tested.
@@ -377,12 +390,12 @@ findPivot m = do
         if k >= nr
            then return idx
            else do
-            v <- MU.unsafeRead m (k, 0)
+            v <- MU.read m (k, 0)
             if aval < abs v
                then go (abs v) (k + 1) k
                else go  aval   (k + 1) idx
 
-    val <- MU.unsafeRead m (0, 0)
+    val <- MU.read m (0, 0)
     piv <- go (abs val) 1 0
     return piv
 
