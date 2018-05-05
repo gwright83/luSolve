@@ -93,8 +93,8 @@ luFactor aOrig = runST $ do
         rowSwap aRight pivots
         triangularSolve aLeft aRight
 
-    aFactored <- M.freeze a
-    pivots'   <- V.freeze pivots
+    aFactored <- M.unsafeFreeze a
+    pivots'   <- V.unsafeFreeze pivots
 
     return (aFactored, pivots')
 
