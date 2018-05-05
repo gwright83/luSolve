@@ -1,25 +1,42 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
+-- |
+-- Module      : Numeric.LinearAlgebra.LUSolve
+-- Copyright   : (c) Gregory Wright 2018
+-- License     : BSD-style
 --
--- LUSolve.hs
+-- Maintainer  : Gregory Wright <gwright@antiope.com.
+-- Stability   : experimental
+-- Portability : non-portable
 --
--- Solve an LU factored system of equations.
+-- The LUSolve library implements Crout's algorithm for in-place
+-- LU decomposition in pure Haskell.  A function using the
+-- LU-factored matrix to solve systems of linear equations is
+-- also provided.
+--
+-- The version of Crout's algorithm is that given by F.G. Gustavson,
+-- /IBM Journal of Research and Development/, Vol. 41, No. 6, 1997,
+-- pp. 737-755.  This is a recursive, in-place, procedure.  Here
+-- it is implemented using a mutable matrix in the ST monad.
+-- Partial (row) pivoting is used for numerical stability.
 --
 
 module Numeric.LinearAlgebra.LUSolve (
+    -- * LU Decomposition
     luFactor,
     luFactor_,
+    -- * Solving Linear Systems
     luSolve
     ) where
 
-import           Control.Loop                      (numLoop, numLoopState)
+import           Control.Loop                      (numLoop)
 import           Control.Monad.ST                  (ST, runST)
-import Control.Monad.ST.Unsafe (unsafeIOToST)
 import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
 import qualified Data.Vector.Unboxed               as V
 import qualified Data.Vector.Unboxed.Mutable       as VU
 
 
+-- | LU Decomposition
+--
 -- Factor a rectangular matrix A into PA = LU, where L is lower triangular,
 -- U is upper triangular and P is the permuation matrix (represented as
 -- a vector containing the location of the nonzero column) that describes
@@ -37,7 +54,22 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 -- The the number of rows is greater than or equal to the number of columns,
 -- one invocation of luFactor_ is all that is needed.
 --
-luFactor :: M.Matrix V.Vector Double -> (M.Matrix V.Vector Double, V.Vector Int)
+-- The LU factored matrix is returned in packed format. The upper triangular
+-- part is the U matrix.  The lower triangular part beneath the main diagonal
+-- is the L matrix without its diagonal entries, which are omitted since they
+-- are known to be 1. This is the traditional way of storing the LU decomposition
+-- and luSolve understand this format.
+--
+-- The returned pivot vector is not a permutaion vector, but instead is
+-- in "NAG pivot format".  Reading the vector from top to bottom
+-- (equivalently, frmo left to right), the current entry specifies which
+-- row to swap with the current row.  Note that unlike in a permutation vector,
+-- where each entry is the index of the nonzero entry of the permutation
+-- matrix, a NAG format pivot vector can have repeated entries.
+--
+luFactor ::  M.Matrix V.Vector Double   -- ^ matrix A
+         -> (M.Matrix V.Vector Double,  -- ^ LU decomposition of A
+             V.Vector Int)              -- ^ row pivots
 luFactor aOrig = runST $ do
     let
         (m, n) = M.dim aOrig
@@ -67,30 +99,30 @@ luFactor aOrig = runST $ do
     return (aFactored, pivots')
 
 
-luFactor_ :: MU.MMatrix VU.MVector s Double
-          -> VU.MVector s Int
+-- | The luFactor function takes a mutable matrix and replaces
+-- it with its LU decomposition.  An unitialized pivot vector
+-- is replaced with the row pivots, in NAG pivot format.
+--
+luFactor_ :: MU.MMatrix VU.MVector s Double  -- ^ matrix A, overwritten by LU
+          -> VU.MVector s Int                -- ^ row pivots
           -> ST s ()
 luFactor_ a pivots = do
     let
         (m, n) = MU.dim a
         n'     = n `div` 2
 
-        mm1  = m  - 1
-        nm1  = n  - 1
-        npm1 = n' - 1
-
     if n == 1
        then pivotAndScale a pivots
        else do
             let
 
-               aLeft  = subMatrix (0, 0)  (mm1, npm1) a
-               aRight = subMatrix (0, n') (mm1, nm1)  a
+               aLeft  = subMatrix (0, 0)  (m - 1, n' - 1) a
+               aRight = subMatrix (0, n') (m - 1, n  - 1) a
 
-               aTopLeft     = subMatrix (0,  0)  (npm1, npm1) a
-               aTopRight    = subMatrix (0,  n') (npm1, nm1)  a
-               aBottomLeft  = subMatrix (n', 0)  (mm1,  npm1) a
-               aBottomRight = subMatrix (n', n') (mm1,  nm1)  a
+               aTopLeft     = subMatrix (0,  0)  (n' - 1, n' - 1) a
+               aTopRight    = subMatrix (0,  n') (n' - 1, n  - 1) a
+               aBottomLeft  = subMatrix (n', 0)  (m  - 1, n' - 1) a
+               aBottomRight = subMatrix (n', n') (m  - 1, n  - 1) a
 
                pivotsTop    = VU.slice 0       n'  pivots
                pivotsBottom = VU.slice n' (n - n') pivots
@@ -102,7 +134,26 @@ luFactor_ a pivots = do
             luFactor_ aBottomRight pivotsBottom
             rowSwap   aBottomLeft  pivotsBottom
 
+            -- Add an offset to pivotsBottom it entries refer to the
+            -- row number of the original matrix, rather than the
+            -- submatrix.
             adjustPivots pivotsBottom n'
+
+
+-- |  Solve the system of equations Ax = b, given A as a packed LU decomposition
+-- and a row permutation vector in NAG pivot format.
+--
+-- The arguments are structured so one can solve the linear system Ax = b
+-- using
+--
+--    x = luSolve (luFactor a) b
+--
+luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposition
+            V.Vector Int)                -- ^ row pivots
+        -> V.Vector Double               -- ^ vector b
+        -> V.Vector Double               -- ^ vector x
+luSolve (_, _) _ = runST $ do undefined
+
 
 
 -- This is a generic mutable matrix multiply.  The mutable references
@@ -153,17 +204,16 @@ matrixMultiply alpha a b beta c = do
         else error "incompatible dimensions"
 
 
--- | O(1) Extract sub matrix
+-- Extract sub matrix
 --
--- Note that the subMatrix function exportsed by the matrices
--- library has a bug which prevents it from correctly taking submatrices
--- of submatrices.  That bug is fixed here.
+-- This is the same as the subMatrix function exported by the
+-- matrices library, but for a mutable matrix.
 --
 subMatrix :: (Int, Int)  -- ^ upper left corner of the submatrix
           -> (Int, Int)  -- ^ bottom right corner of the submatrix
           -> MU.MMatrix v s a -> MU.MMatrix v s a
 {-# INLINE subMatrix #-}
-subMatrix (i,j) (i',j') (MU.MMatrix _ n tda offset vec)
+subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
     | m' <= 0 || n' <= 0 = error "incorrect dimensions in subMatrix"
     | otherwise = MU.MMatrix m' n' tda offset' vec
   where
@@ -182,7 +232,7 @@ subMatrix (i,j) (i',j') (MU.MMatrix _ n tda offset vec)
 -- may repeat.
 --
 -- Note that in either format, an entry which is the same as its
--- index indicates a row that was not swapped.
+-- index indicates a row that is not swapped.
 --
 rowSwap :: MU.MMatrix VU.MVector s Double
         -> VU.MVector s Int
@@ -206,6 +256,9 @@ rowSwap a pivots = do
            else return ()
 
 
+-- pivotAndScale computes the LU decompostion of a matrix
+-- with a single column.
+--
 pivotAndScale :: MU.MMatrix VU.MVector s Double
               -> VU.MVector s Int
               -> ST s ()
@@ -274,46 +327,33 @@ findPivot m = do
         (nr, _) = MU.dim m
 
         go aval k idx = do
-        if k >= nr
-           then return idx
-           else do
-            v <- MU.unsafeRead m (k, 0)
-            if aval < abs v
-               then go (abs v) (k + 1) k
-               else go  aval   (k + 1) idx
+            if k >= nr
+                then return idx
+                else do
+                    v <- MU.unsafeRead m (k, 0)
+                    if aval < abs v
+                        then go (abs v) (k + 1) k
+                        else go  aval   (k + 1) idx
 
     val <- MU.unsafeRead m (0, 0)
     piv <- go (abs val) 1 0
     return piv
 
 
--- Solve the system of equations Ax = b, given A as a packed LU decomposition
--- and a row permutation vector in NAG pivot format.
---
--- The arguments are structured so one can solve the linear system Ax = b
--- using
---
---    x = luSolve (luFactor a) b
---
-luSolve :: (M.Matrix V.Vector Double,    -- matrix A, as a packed LU decomposition
-            V.Vector Int)                -- row permutation vector
-        -> V.Vector Double               -- vector b
-        -> V.Vector Double               -- vector x
-luSolve (a, perm) b = runST $ do undefined
-
-
+testMat :: M.Matrix V.Vector Double
 testMat = M.fromLists [[0.772386, 0.499327, 0.189312],
                        [0.759731, 0.799350, 0.682719],
                        [0.456574, 0.636521, 0.003035],
                        [0.014020, 0.636044, 0.990054]]
 
+testMat' :: M.Matrix V.Vector Double
 testMat' = M.fromLists [[0.772386, 0.499327, 0.189312, 0.014020],
                         [0.759731, 0.799350, 0.682719, 0.636044],
                         [0.456574, 0.636521, 0.003035, 0.990054]]
 
 
-test :: (M.Matrix V.Vector Double, V.Vector Int)
-test = luFactor testMat
+_test :: (M.Matrix V.Vector Double, V.Vector Int)
+_test = luFactor testMat
 
-test' :: (M.Matrix V.Vector Double, V.Vector Int)
-test' = luFactor testMat'
+_test' :: (M.Matrix V.Vector Double, V.Vector Int)
+_test' = luFactor testMat'

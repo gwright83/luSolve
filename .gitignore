@@ -1,3 +1,26 @@
+#
+# .gitignore for haskell projects
+#
+# G. Wright, 20 July 2015
+#
+
+dist
+cabal-dev
+*.o
+*.hi
+*.chi
+*.chs.h
+.dir-locals.el
+*.dyn_o
+*.dyn_hi
+.hpc
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+*.prof
+*.aux
+*.hp
 .stack-work/
-luSolve.cabal
+.DS_Store
+*.dSYM/
 *~
