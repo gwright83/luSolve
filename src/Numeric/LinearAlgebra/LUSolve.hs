@@ -27,7 +27,7 @@ module Numeric.LinearAlgebra.LUSolve (
     luSolve
     ) where
 
-import           Control.Loop                      (numLoop)
+import           Control.Loop                      (forLoop, numLoop)
 import           Control.Monad.ST                  (ST, runST)
 import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
@@ -152,7 +152,31 @@ luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposi
             V.Vector Int)                -- ^ row pivots
         -> V.Vector Double               -- ^ vector b
         -> V.Vector Double               -- ^ vector x
-luSolve (_, _) _ = runST $ do undefined
+luSolve (lu, pivots) b = runST $ do
+    let
+        (m, n) = M.dim lu
+
+    x <- VU.unsafeNew n
+
+    if m /= n
+       then error "under- (or over-) determined system in luSolve"
+       else do
+        forLoop 0 (< n) (+ 1) $ \i -> do
+            VU.unsafeWrite x i (b `V.unsafeIndex` (pivots `V.unsafeIndex` i))
+            forLoop 0 (< i) (+ 1) $ \k -> do
+                xi <- VU.unsafeRead x i
+                xk <- VU.unsafeRead x k
+                VU.unsafeWrite x i (xi - xk * lu `M.unsafeIndex` (i, k))
+        forLoop (n - 1) (>= 0) (subtract 1) $ \i -> do
+            forLoop (i + 1) (< n) (+ 1) $ \k -> do
+                xi <- VU.unsafeRead x i
+                xk <- VU.unsafeRead x k
+                VU.unsafeWrite x i (xi - xk * lu `M.unsafeIndex` (i, k))
+            xi <- VU.unsafeRead x i
+            VU.unsafeWrite x i (xi / (lu `M.unsafeIndex` (i, i)))
+
+    x' <- V.unsafeFreeze x
+    return x'
 
 
 
