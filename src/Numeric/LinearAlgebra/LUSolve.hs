@@ -5,7 +5,11 @@
 -- Solve an LU factored system of equations.
 --
 
-module Numeric.LinearAlgebra.LUSolve where
+module Numeric.LinearAlgebra.LUSolve (
+    luFactor,
+    luFactor_,
+    luSolve
+    ) where
 
 import           Control.Loop                      (numLoop, numLoopState)
 import           Control.Monad.ST                  (ST, runST)
@@ -14,7 +18,6 @@ import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
 import qualified Data.Vector.Unboxed               as V
 import qualified Data.Vector.Unboxed.Mutable       as VU
-import Debug.Trace
 
 
 -- Factor a rectangular matrix A into PA = LU, where L is lower triangular,
@@ -102,51 +105,6 @@ luFactor_ a pivots = do
             adjustPivots pivotsBottom n'
 
 
-
-mPeek :: MU.MMatrix VU.MVector s Double -> ST s ()
-mPeek a = do
-    let
-        (m, n) = MU.dim a
-    numLoop 0 (m - 1) $ \i -> do
-      unsafeIOToST (putStr "\n")
-      numLoop 0 (n - 1) $ \j -> do
-        aij <- MU.read a (i, j)
-        unsafeIOToST (putStr ((show aij) ++ "  "))
-    unsafeIOToST (putStr "\n")
-
-
-mvPeek :: MU.MMatrix VU.MVector s Double -> ST s ()
-mvPeek (MU.MMatrix _ _ _ _ v)  = do
-    let
-        n = VU.length v
-    unsafeIOToST (putStr "\n")
-    numLoop 0 (n - 1) $ \i -> do
-        vi <- VU.read v i
-        unsafeIOToST (putStrLn (show vi))
-
-
-dumpMat :: MU.MMatrix VU.MVector s Double -> ST s ()
-dumpMat (MU.MMatrix m n tda offset v)  = do
-    let
-        vl = VU.length v
-    unsafeIOToST $ putStrLn $ "(m, n, tda, offset) = (" ++ show m ++ ", " ++ show n ++
-        ", " ++ show tda ++ ", " ++ show offset ++ ")"
-    unsafeIOToST (putStr "\n")
-    numLoop 0 (vl - 1) $ \i -> do
-        vi <- VU.read v i
-        unsafeIOToST (putStrLn (show vi))
-
-
-vPeek :: VU.MVector s Int -> ST s ()
-vPeek v = do
-    let
-        n = VU.length v
-    unsafeIOToST (putStr "\n")
-    numLoop 0 (n - 1) $ \i -> do
-        vi <- VU.read v i
-        unsafeIOToST (putStrLn (show vi))
-
-
 -- This is a generic mutable matrix multiply.  The mutable references
 -- need not be distinct, allowing it to be used as part of an in-place
 -- algorithm like LU factorization.
@@ -196,6 +154,10 @@ matrixMultiply alpha a b beta c = do
 
 
 -- | O(1) Extract sub matrix
+--
+-- Note that the subMatrix function exportsed by the matrices
+-- library has a bug which prevents it from correctly taking submatrices
+-- of submatrices.  That bug is fixed here.
 --
 subMatrix :: (Int, Int)  -- ^ upper left corner of the submatrix
           -> (Int, Int)  -- ^ bottom right corner of the submatrix
@@ -280,12 +242,12 @@ adjustPivots pivots offset = do
         VU.unsafeWrite pivots i (ip + offset)
 
 
--- TriangularSolve solves the linear system AX = B when A is upper
+-- TriangularSolve solves the linear system AX = B where A is upper
 -- triangular.  The matrix B is overwritten, column by column, by
 -- the solution matrix X.
 --
-triangularSolve :: MU.MMatrix VU.MVector s Double
-                -> MU.MMatrix VU.MVector s Double
+triangularSolve :: MU.MMatrix VU.MVector s Double   -- matrix A
+                -> MU.MMatrix VU.MVector s Double   -- matrix B
                 -> ST s ()
 triangularSolve a b = do
     let
@@ -303,7 +265,8 @@ triangularSolve a b = do
             MU.unsafeWrite b (i, j) (bij - bkj * aik)
 
 
--- Should be correct, but still needs to be tested.
+-- Return the index of the matrix element with the largest absolute
+-- value in the first column.
 --
 findPivot :: MU.MMatrix VU.MVector s Double -> ST s Int
 findPivot m = do
@@ -325,9 +288,9 @@ findPivot m = do
 
 
 -- Solve the system of equations Ax = b, given A as a packed LU decomposition
--- and a row permutation vector.
+-- and a row permutation vector in NAG pivot format.
 --
--- The arguments are structure so one can solve the linear system ax = b
+-- The arguments are structured so one can solve the linear system Ax = b
 -- using
 --
 --    x = luSolve (luFactor a) b
