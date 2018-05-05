@@ -75,7 +75,7 @@ luFactor aOrig = runST $ do
         (m, n) = M.dim aOrig
         mnMin  = min m n
 
-    a      <- M.thaw aOrig
+    a      <- M.unsafeThaw aOrig
     pivots <- VU.unsafeNew mnMin
 
     let
