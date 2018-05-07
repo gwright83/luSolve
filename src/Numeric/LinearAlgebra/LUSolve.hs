@@ -78,7 +78,7 @@ luFactor aOrig = runST $ do
         mnMin  = min m n
 
     a      <- M.thaw aOrig         -- thaw forces a copy, since we might use aOrig again.
-    pivots <- VU.unsafeNew mnMin
+    pivots <- VU.unsafeNew mnMin   -- unsafe, since it not used outside this function.
     parity <- newSTRef 1
 
     let
@@ -163,20 +163,27 @@ luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposi
 luSolve (lu, pivots, _) b = runST $ do
     let
         (m, n) = M.dim lu
+        (l, _) = M.dim b
 
     x <- M.thaw b
 
     if m /= n
        then error "under- (or over-) determined system in luSolve"
-       else luSolve_ (lu, pivots) x
+       else if n /= l
+        then error "incompatible dimensions in luSolve_"
+        else luSolve_ (lu, pivots) x
 
     x' <- M.unsafeFreeze x
     return x'
 
 
-luSolve_ :: (M.Matrix V.Vector Double,
-             V.Vector Int)
-         -> MU.MMatrix VU.MVector s Double
+-- | luSolve_ does the work of solving the system of linear equations Ax = b.
+-- The input matrix b is overwritten by the solution x.  Dimensions
+-- are not checked; that should be done by the calling function.
+--
+luSolve_ :: (M.Matrix V.Vector Double,      -- ^ matrix A, as a packed LU decomposition
+             V.Vector Int)                  -- ^ pivot vector
+         -> MU.MMatrix VU.MVector s Double  -- ^ right hand side b, overwritten by x
          -> ST s ()
 luSolve_ (lu, pivots) b = do
     lu'     <- M.thaw lu
