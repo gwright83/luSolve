@@ -157,7 +157,7 @@ luFactor_ a pivots parity = do
 --
 luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposition
             V.Vector Int,                -- ^ row pivots
-            Int)                         -- ^ parity
+            Int)                         -- ^ parity, ignored here
         -> M.Matrix V.Vector Double      -- ^ matrix B
         -> M.Matrix V.Vector Double      -- ^ matrix X
 luSolve (lu, pivots, _) b = runST $ do
@@ -171,7 +171,7 @@ luSolve (lu, pivots, _) b = runST $ do
        then error "under- (or over-) determined system in luSolve"
        else if n /= l
         then error "incompatible dimensions in luSolve_"
-        else luSolve_ (lu, pivots) x
+        else luSolve_ lu pivots x
 
     x' <- M.unsafeFreeze x
     return x'
@@ -181,13 +181,13 @@ luSolve (lu, pivots, _) b = runST $ do
 -- The input matrix b is overwritten by the solution x.  Dimensions
 -- are not checked; that should be done by the calling function.
 --
-luSolve_ :: (M.Matrix V.Vector Double,      -- ^ matrix A, as a packed LU decomposition
-             V.Vector Int)                  -- ^ pivot vector
+luSolve_ :: M.Matrix V.Vector Double        -- ^ matrix A, as a packed LU decomposition
+         -> V.Vector Int                    -- ^ pivot vector
          -> MU.MMatrix VU.MVector s Double  -- ^ right hand side b, overwritten by x
          -> ST s ()
-luSolve_ (lu, pivots) b = do
-    lu'     <- M.thaw lu
-    pivots' <- V.thaw pivots
+luSolve_ lu pivots b = do
+    lu'     <- M.unsafeThaw lu       -- Can be unsafe, since it is only read.
+    pivots' <- V.unsafeThaw pivots   -- Ditto.
     rowSwap b pivots'
     triangularSolve Lower Unit    lu' b
     triangularSolve Upper NonUnit lu' b
@@ -383,7 +383,7 @@ triangularSolve Upper unit a b = do
         (_, n) = MU.dim b
 
     numLoop 0 (n - 1) $ \j ->
-      forLoop (m - 1) (<= 0) (subtract 1) $ \k -> do
+      forLoop (m - 1) (>= 0) (subtract 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
         if bkj == 0
            then return ()
@@ -398,6 +398,28 @@ triangularSolve Upper unit a b = do
                 aik  <- MU.unsafeRead a (i, k)
                 bkj' <- MU.unsafeRead b (k, j)
                 MU.unsafeWrite b (i, j) (bij - bkj' * aik)
+
+
+testTriSolve :: M.Matrix V.Vector Double
+             -> M.Matrix V.Vector Double
+             -> M.Matrix V.Vector Double
+testTriSolve a b = runST $ do
+    a' <- M.thaw a
+    b' <- M.thaw b
+    triangularSolve Upper NonUnit a' b'
+    b'' <- M.freeze b'
+    return b''
+
+
+testTriSolve' :: M.Matrix V.Vector Double
+              -> M.Matrix V.Vector Double
+              -> M.Matrix V.Vector Double
+testTriSolve' a b = runST $ do
+    a' <- M.thaw a
+    b' <- M.thaw b
+    triangularSolve Lower Unit a' b'
+    b'' <- M.freeze b'
+    return b''
 
 
 -- Return the index of the matrix element with the largest absolute
