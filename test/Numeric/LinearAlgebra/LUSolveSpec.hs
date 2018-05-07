@@ -33,13 +33,13 @@ randomColumnVectors n = Prelude.map (\vs -> M.fromLists (bundle 1 vs )) (bundle 
 
 
 checkLinearSystemSolution :: M.Matrix V.Vector Double
-                          -> M.Matrix V.Vector Double
-                          -> (M.Matrix V.Vector Double, M.Matrix V.Vector Double)
+                          -> M.Matrix V.Vector Double -> Double
+                          -- -> (M.Matrix V.Vector Double, M.Matrix V.Vector Double)
 checkLinearSystemSolution a b = let
     x  = luSolve (luFactor a) b
     b' = matrixMultiply a x
     in
-      (b, b')
+      maxAbsDiff b b'
 
 -- Multiply two matrices
 --

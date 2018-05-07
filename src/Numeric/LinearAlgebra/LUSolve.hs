@@ -435,6 +435,12 @@ testMat' = M.fromLists [[0.772386, 0.499327, 0.189312, 0.014020],
                         [0.456574, 0.636521, 0.003035, 0.990054]]
 
 
+testMat'' :: M.Matrix V.Vector Double
+testMat'' = M.fromLists [[4.0, 3.0, 1.0, 3.0],
+                         [3.0, 5.0, 6.0, 8.0],
+                         [1.0, 6.0, 2.0, 7.0],
+                         [3.0, 8.0, 7.0, 9.0]]
+
 _test :: (M.Matrix V.Vector Double, V.Vector Int, Int)
 _test = luFactor testMat
 
