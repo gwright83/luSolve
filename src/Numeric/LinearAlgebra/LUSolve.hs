@@ -31,6 +31,7 @@ import           Control.Loop                      (forLoop, numLoop)
 import           Control.Monad.ST                  (ST, runST)
 import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
+import           Data.STRef.Strict
 import qualified Data.Vector.Unboxed               as V
 import qualified Data.Vector.Unboxed.Mutable       as VU
 
@@ -69,19 +70,21 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 --
 luFactor ::  M.Matrix V.Vector Double   -- ^ matrix A
          -> (M.Matrix V.Vector Double,  -- ^ LU decomposition of A
-             V.Vector Int)              -- ^ row pivots
+             V.Vector Int,              -- ^ row pivots
+             Int)                       -- ^ parity = (-1)^(number of row interchanges)
 luFactor aOrig = runST $ do
     let
         (m, n) = M.dim aOrig
         mnMin  = min m n
 
-    a      <- M.unsafeThaw aOrig
+    a      <- M.thaw aOrig         -- thaw forces a copy, since we might use aOrig again.
     pivots <- VU.unsafeNew mnMin
+    parity <- newSTRef 1
 
     let
         a' = subMatrix (0, 0) (m - 1, mnMin - 1) a
 
-    luFactor_ a' pivots
+    luFactor_ a' pivots parity
 
     if m >= n
        then do return ()
@@ -95,8 +98,9 @@ luFactor aOrig = runST $ do
 
     aFactored <- M.unsafeFreeze a
     pivots'   <- V.unsafeFreeze pivots
+    parity'   <- readSTRef parity
 
-    return (aFactored, pivots')
+    return (aFactored, pivots', parity')
 
 
 -- | The luFactor function takes a mutable matrix and replaces
@@ -105,14 +109,15 @@ luFactor aOrig = runST $ do
 --
 luFactor_ :: MU.MMatrix VU.MVector s Double  -- ^ matrix A, overwritten by LU
           -> VU.MVector s Int                -- ^ row pivots
+          -> STRef s Int                     -- ^ parity
           -> ST s ()
-luFactor_ a pivots = do
+luFactor_ a pivots parity = do
     let
         (m, n) = MU.dim a
         n'     = n `div` 2
 
     if n == 1
-       then pivotAndScale a pivots
+       then pivotAndScale a pivots parity
        else do
             let
 
@@ -127,11 +132,11 @@ luFactor_ a pivots = do
                pivotsTop    = VU.slice 0       n'  pivots
                pivotsBottom = VU.slice n' (n - n') pivots
 
-            luFactor_ aLeft  pivotsTop
+            luFactor_ aLeft  pivotsTop parity
             rowSwap   aRight pivotsTop
             triangularSolve Lower Unit aTopLeft  aTopRight
             matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
-            luFactor_ aBottomRight pivotsBottom
+            luFactor_ aBottomRight pivotsBottom parity
             rowSwap   aBottomLeft  pivotsBottom
 
             -- Add an offset to pivotsBottom it entries refer to the
@@ -151,10 +156,11 @@ luFactor_ a pivots = do
 --    x = luSolve (luFactor a) b
 --
 luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposition
-            V.Vector Int)                -- ^ row pivots
+            V.Vector Int,                -- ^ row pivots
+            Int)                         -- ^ parity
         -> M.Matrix V.Vector Double      -- ^ matrix B
         -> M.Matrix V.Vector Double      -- ^ matrix X
-luSolve (lu, pivots) b = runST $ do
+luSolve (lu, pivots, _) b = runST $ do
     let
         (m, n) = M.dim lu
 
@@ -285,14 +291,20 @@ rowSwap a pivots = do
 --
 pivotAndScale :: MU.MMatrix VU.MVector s Double
               -> VU.MVector s Int
+              -> STRef s Int
               -> ST s ()
-pivotAndScale a pivots = do
+{-# INLINE pivotAndScale #-}
+pivotAndScale a pivots parity = do
     ip   <- findPivot a
     temp <- MU.unsafeRead a (0,  0)
     aip  <- MU.unsafeRead a (ip, 0)
     MU.unsafeWrite a (0,  0) aip
     MU.unsafeWrite a (ip, 0) temp
     VU.unsafeWrite pivots 0 ip
+
+    if ip /= 0
+       then modifySTRef' parity (* (-1))
+       else return ()
 
     -- Scale the elememts below the first.
     let
@@ -310,6 +322,7 @@ pivotAndScale a pivots = do
 adjustPivots :: VU.MVector s Int
              -> Int
              -> ST s ()
+{-# INLINE adjustPivots #-}
 adjustPivots pivots offset = do
     let
         nPivots = VU.length pivots
@@ -352,10 +365,10 @@ triangularSolve Lower unit a b = do
                 MU.unsafeWrite b (k, j) (bkj / akk)
                 else return ()
             numLoop (k + 1) (m - 1) $ \i -> do
-            bij  <- MU.unsafeRead b (i, j)
-            aik  <- MU.unsafeRead a (i, k)
-            bkj' <- MU.unsafeRead b (k, j)
-            MU.unsafeWrite b (i, j) (bij - bkj' * aik)
+                bij  <- MU.unsafeRead b (i, j)
+                aik  <- MU.unsafeRead a (i, k)
+                bkj' <- MU.unsafeRead b (k, j)
+                MU.unsafeWrite b (i, j) (bij - bkj' * aik)
 
 triangularSolve Upper unit a b = do
     let
@@ -374,10 +387,10 @@ triangularSolve Upper unit a b = do
                 MU.unsafeWrite b (k, j) (bkj / akk)
                 else return ()
             numLoop 0 (k - 1) $ \i -> do
-            bij  <- MU.unsafeRead b (i, j)
-            aik  <- MU.unsafeRead a (i, k)
-            bkj' <- MU.unsafeRead b (k, j)
-            MU.unsafeWrite b (i, j) (bij - bkj' * aik)
+                bij  <- MU.unsafeRead b (i, j)
+                aik  <- MU.unsafeRead a (i, k)
+                bkj' <- MU.unsafeRead b (k, j)
+                MU.unsafeWrite b (i, j) (bij - bkj' * aik)
 
 
 -- Return the index of the matrix element with the largest absolute
@@ -414,8 +427,8 @@ testMat' = M.fromLists [[0.772386, 0.499327, 0.189312, 0.014020],
                         [0.456574, 0.636521, 0.003035, 0.990054]]
 
 
-_test :: (M.Matrix V.Vector Double, V.Vector Int)
+_test :: (M.Matrix V.Vector Double, V.Vector Int, Int)
 _test = luFactor testMat
 
-_test' :: (M.Matrix V.Vector Double, V.Vector Int)
+_test' :: (M.Matrix V.Vector Double, V.Vector Int, Int)
 _test' = luFactor testMat'
