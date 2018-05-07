@@ -91,7 +91,7 @@ luFactor aOrig = runST $ do
             aRight = subMatrix (0, m) (m - 1, n - 1) a
 
         rowSwap aRight pivots
-        triangularSolve aLeft aRight
+        triangularSolve Lower Unit aLeft aRight
 
     aFactored <- M.unsafeFreeze a
     pivots'   <- V.unsafeFreeze pivots
@@ -129,7 +129,7 @@ luFactor_ a pivots = do
 
             luFactor_ aLeft  pivotsTop
             rowSwap   aRight pivotsTop
-            triangularSolve aTopLeft  aTopRight
+            triangularSolve Lower Unit aTopLeft  aTopRight
             matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
             luFactor_ aBottomRight pivotsBottom
             rowSwap   aBottomLeft  pivotsBottom
@@ -140,44 +140,44 @@ luFactor_ a pivots = do
             adjustPivots pivotsBottom n'
 
 
--- |  Solve the system of equations Ax = b, given A as a packed LU decomposition
--- and a row permutation vector in NAG pivot format.
+-- |  Solve the system of equations AX = B, given A as a packed LU decomposition
+-- and a row permutation vector in NAG pivot format.  Note that X and B are
+-- matrices, not vectors.  This allows solving for multiple right hand sides
+-- simultanously.
 --
--- The arguments are structured so one can solve the linear system Ax = b
+-- The arguments are structured so one can solve the linear system AX = B
 -- using
 --
 --    x = luSolve (luFactor a) b
 --
 luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposition
             V.Vector Int)                -- ^ row pivots
-        -> V.Vector Double               -- ^ vector b
-        -> V.Vector Double               -- ^ vector x
+        -> M.Matrix V.Vector Double      -- ^ matrix B
+        -> M.Matrix V.Vector Double      -- ^ matrix X
 luSolve (lu, pivots) b = runST $ do
     let
         (m, n) = M.dim lu
 
-    x <- VU.unsafeNew n
+    x <- M.thaw b
 
     if m /= n
        then error "under- (or over-) determined system in luSolve"
-       else do
-        forLoop 0 (< n) (+ 1) $ \i -> do
-            VU.unsafeWrite x i (b `V.unsafeIndex` (pivots `V.unsafeIndex` i))
-            forLoop 0 (< i) (+ 1) $ \k -> do
-                xi <- VU.unsafeRead x i
-                xk <- VU.unsafeRead x k
-                VU.unsafeWrite x i (xi - xk * lu `M.unsafeIndex` (i, k))
-        forLoop (n - 1) (>= 0) (subtract 1) $ \i -> do
-            forLoop (i + 1) (< n) (+ 1) $ \k -> do
-                xi <- VU.unsafeRead x i
-                xk <- VU.unsafeRead x k
-                VU.unsafeWrite x i (xi - xk * lu `M.unsafeIndex` (i, k))
-            xi <- VU.unsafeRead x i
-            VU.unsafeWrite x i (xi / (lu `M.unsafeIndex` (i, i)))
+       else luSolve_ (lu, pivots) x
 
-    x' <- V.unsafeFreeze x
+    x' <- M.unsafeFreeze x
     return x'
 
+
+luSolve_ :: (M.Matrix V.Vector Double,
+             V.Vector Int)
+         -> MU.MMatrix VU.MVector s Double
+         -> ST s ()
+luSolve_ (lu, pivots) b = do
+    lu'     <- M.thaw lu
+    pivots' <- V.thaw pivots
+    rowSwap b pivots'
+    triangularSolve Lower Unit    lu' b
+    triangularSolve Upper NonUnit lu' b
 
 
 -- This is a generic mutable matrix multiply.  The mutable references
@@ -319,14 +319,23 @@ adjustPivots pivots offset = do
         VU.unsafeWrite pivots i (ip + offset)
 
 
+data Triangle = Upper | Lower
+    deriving (Eq, Show)
+
+data DiagonalUnit = Unit | NonUnit
+    deriving (Eq, Show)
+
+
 -- TriangularSolve solves the linear system AX = B where A is upper
 -- triangular.  The matrix B is overwritten, column by column, by
 -- the solution matrix X.
 --
-triangularSolve :: MU.MMatrix VU.MVector s Double   -- matrix A
+triangularSolve :: Triangle                         -- is A upper or lower triangular?
+                -> DiagonalUnit                     -- diagonal entries are 1 or not?
+                -> MU.MMatrix VU.MVector s Double   -- matrix A
                 -> MU.MMatrix VU.MVector s Double   -- matrix B
                 -> ST s ()
-triangularSolve a b = do
+triangularSolve Lower unit a b = do
     let
         (_, m) = MU.dim a
         (_, n) = MU.dim b
@@ -336,10 +345,39 @@ triangularSolve a b = do
         bkj <- MU.unsafeRead b (k, j)
         if bkj == 0
            then return ()
-           else numLoop (k + 1) (m - 1) $ \i -> do
-            bij <- MU.unsafeRead b (i, j)
-            aik <- MU.unsafeRead a (i, k)
-            MU.unsafeWrite b (i, j) (bij - bkj * aik)
+           else do
+            if unit == NonUnit
+                then do
+                akk <- MU.unsafeRead a (k, k)
+                MU.unsafeWrite b (k, j) (bkj / akk)
+                else return ()
+            numLoop (k + 1) (m - 1) $ \i -> do
+            bij  <- MU.unsafeRead b (i, j)
+            aik  <- MU.unsafeRead a (i, k)
+            bkj' <- MU.unsafeRead b (k, j)
+            MU.unsafeWrite b (i, j) (bij - bkj' * aik)
+
+triangularSolve Upper unit a b = do
+    let
+        (_, m) = MU.dim a
+        (_, n) = MU.dim b
+
+    numLoop 0 (n - 1) $ \j ->
+      forLoop (m - 1) (<= 0) (subtract 1) $ \k -> do
+        bkj <- MU.unsafeRead b (k, j)
+        if bkj == 0
+           then return ()
+           else do
+            if unit == NonUnit
+                then do
+                akk <- MU.unsafeRead a (k, k)
+                MU.unsafeWrite b (k, j) (bkj / akk)
+                else return ()
+            numLoop 0 (k - 1) $ \i -> do
+            bij  <- MU.unsafeRead b (i, j)
+            aik  <- MU.unsafeRead a (i, k)
+            bkj' <- MU.unsafeRead b (k, j)
+            MU.unsafeWrite b (i, j) (bij - bkj' * aik)
 
 
 -- Return the index of the matrix element with the largest absolute
