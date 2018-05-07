@@ -274,6 +274,7 @@ subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
 rowSwap :: MU.MMatrix VU.MVector s Double
         -> VU.MVector s Int
         -> ST s ()
+{-# INLINE rowSwap #-}
 rowSwap a pivots = do
     let
         (_, nc) = MU.dim a
@@ -398,28 +399,6 @@ triangularSolve Upper unit a b = do
                 aik  <- MU.unsafeRead a (i, k)
                 bkj' <- MU.unsafeRead b (k, j)
                 MU.unsafeWrite b (i, j) (bij - bkj' * aik)
-
-
-testTriSolve :: M.Matrix V.Vector Double
-             -> M.Matrix V.Vector Double
-             -> M.Matrix V.Vector Double
-testTriSolve a b = runST $ do
-    a' <- M.thaw a
-    b' <- M.thaw b
-    triangularSolve Upper NonUnit a' b'
-    b'' <- M.freeze b'
-    return b''
-
-
-testTriSolve' :: M.Matrix V.Vector Double
-              -> M.Matrix V.Vector Double
-              -> M.Matrix V.Vector Double
-testTriSolve' a b = runST $ do
-    a' <- M.thaw a
-    b' <- M.thaw b
-    triangularSolve Lower Unit a' b'
-    b'' <- M.freeze b'
-    return b''
 
 
 -- Return the index of the matrix element with the largest absolute
