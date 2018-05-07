@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:           luSolve
-version:        0.1.0.0
+version:        0.1
 description:    Please see the README on Github at <https://github.com/githubuser/luSolve#readme>
 homepage:       https://gitlab.18clay.com/software/luSolve#readme
 bug-reports:    https://gitlab.18clay.com/software/luSolve/issues
