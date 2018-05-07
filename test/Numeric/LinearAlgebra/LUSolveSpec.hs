@@ -4,38 +4,73 @@
 -- Tests the exposed LU decomposition and linear system solver.
 --
 --
-module Numeric.SpecialFunction.LUSolveSpec where
+module Numeric.LinearAlgebra.LUSolveSpec where
 
 import           Test.Hspec
 
+import           Data.Matrix.Dense.Generic
+import qualified Data.Vector                   as V
 import           Numeric.LinearAlgebra.LUSolve
 
 
 
+-- Multiply two matrices
+--
+matrixMultiply :: Matrix V.Vector Double
+               -> Matrix V.Vector Double
+               -> Matrix V.Vector Double
+matrixMultiply a b = let
+    (ra, ca) = dim a
+    (rb, cb) = dim b
+    in
+      if ca /= rb
+      then error "incompatible dimensions in matrixMultiply"
+      else fromLists [[ sum [ a ! (i, k) * b ! (k, j) | k <- [0 .. (ca - 1)]]
+                                                      | j <- [0 .. (cb - 1)]]
+                                                      | i <- [0 .. (ra - 1)]]
 
 -- Return the largest difference (by absolute value) between
--- two lists of Doubles.
+-- two matrices.
 --
-maxAbsDiff :: [ Double ] -> [ Double ] -> Double
-maxAbsDiff f f' = maximum $ zipWith (\y y' -> abs (y - y')) f f'
+maxAbsDiff :: Matrix V.Vector Double
+           -> Matrix V.Vector Double
+           -> Double
+maxAbsDiff (Matrix m n _ _ v) (Matrix m' n' _ _ v') =
+    if m == m' && n == n'
+    then maximum $ V.zipWith (\y y' -> abs (y - y')) v v'
+    else error "unequal matrix dimensions is maxAbsDiff"
 
 
 -- Return the largest difference (by relative value) between
--- two lists of Doubles.
+-- two matrices.
 --
-maxRelDiff :: [ Double ] -> [ Double ] -> Double
-maxRelDiff f f' = maximum $ zipWith (\y y' -> abs ((y - y') / y') ) f f'
+maxRelDiff :: Matrix V.Vector Double
+           -> Matrix V.Vector Double
+           -> Double
+maxRelDiff (Matrix m n _ _ v) (Matrix m' n' _ _ v') =
+    if m == m' && n == n'
+    then maximum $ V.zipWith (\y y' -> abs (2 * (y - y') / (abs y + abs y'))) v v'
+    else error "unequal matrix dimensions is maxRelDiff"
+
+
+matrixSpecRelDiff :: Double
+matrixSpecRelDiff = 1.0e-9
+
+luCheck10 :: Matrix V.Vector Double
+luCheck10 = fromLists [[1.0], [2.0], [3.0]]
+
+luCheck10' :: Matrix V.Vector Double
+luCheck10' = fromLists [[1.0], [2.0], [3.0]]
 
 
 -- The tests themselves
 --
 spec :: Spec
 spec = do
-    describe "Numeric.SpecFunction.BesselK0.besselK0" $ do
-        it "agrees with Gnu Scientific Library gsl_sf_bessel_K0" $ do
-            (besselArgs, besselK0Vals) <- readTable besselK0TableName
-            maxRelDiff (map besselK0 besselArgs) besselK0Vals
-                `shouldSatisfy` (< besselSpecRelDiff)
+    describe "Numeric.LinearAlgebra.LUSolve.luSolve" $ do
+        it "random 10 * 10 matrix is solved" $ do
+            maxRelDiff luCheck10 luCheck10'
+                `shouldSatisfy` (< matrixSpecRelDiff)
 
 
 
