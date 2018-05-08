@@ -8,7 +8,7 @@ module Numeric.LinearAlgebra.LUSolveSpec where
 
 import           Test.Hspec
 
-import           Data.Matrix.Dense.Generic     as M
+import           Data.Matrix.Dense.Generic     as M hiding (zipWith)
 import qualified Data.Vector.Unboxed           as V
 import           Numeric.LinearAlgebra.LUSolve
 import           System.Random
@@ -79,25 +79,40 @@ maxRelDiff (Matrix m n _ _ v) (Matrix m' n' _ _ v') =
     else error "unequal matrix dimensions is maxRelDiff"
 
 
-matrixSpecRelDiff :: Double
-matrixSpecRelDiff = 1.0e-9
+matrixSpecAbsDiff :: Double
+matrixSpecAbsDiff = 1.0e-9
 
-luCheck10 :: M.Matrix V.Vector Double
-luCheck10 = fromLists [[1.0], [2.0], [3.0]]
-
-luCheck10' :: M.Matrix V.Vector Double
-luCheck10' = fromLists [[1.0], [2.0], [3.0]]
-
-
+runCheck :: Int -> Int -> [Double]
+runCheck n size = take n $ zipWith checkLinearSystemSolution (randomSquareMatrices size)
+                                                             (randomColumnVectors  size)
 -- The tests themselves
 --
 spec :: Spec
 spec = do
     describe "Numeric.LinearAlgebra.LUSolve.luSolve" $ do
-        it "random 10 * 10 matrix is solved" $ do
-            maxRelDiff luCheck10 luCheck10'
-                `shouldSatisfy` (< matrixSpecRelDiff)
+        it "Solve 1000 random 10 * 10 systems" $ do
+            (maximum $ runCheck 1000 10)
+                `shouldSatisfy` (< matrixSpecAbsDiff)
 
+    describe "Numeric.LinearAlgebra.LUSolve.luSolve" $ do
+        it "Solve 100 random 50 * 50 systems" $ do
+            (maximum $ runCheck 100 50)
+                `shouldSatisfy` (< matrixSpecAbsDiff)
+
+    describe "Numeric.LinearAlgebra.LUSolve.luSolve" $ do
+        it "Solve 100 random 100 * 100 systems" $ do
+            (maximum $ runCheck 100 100)
+                `shouldSatisfy` (< matrixSpecAbsDiff)
+
+    describe "Numeric.LinearAlgebra.LUSolve.luSolve" $ do
+        it "Solve 100 random 500 * 500 systems" $ do
+            (maximum $ runCheck 100 500)
+                `shouldSatisfy` (< matrixSpecAbsDiff)
+
+    describe "Numeric.LinearAlgebra.LUSolve.luSolve" $ do
+        it "Solve 100 random 1000 * 1000 systems" $ do
+            (maximum $ runCheck 100 1000)
+                `shouldSatisfy` (< matrixSpecAbsDiff)
 
 
 main :: IO ()
