@@ -29,6 +29,7 @@ module Numeric.LinearAlgebra.LUSolve (
 
 import           Control.Loop                      (forLoop, numLoop)
 import           Control.Monad.ST                  (ST, runST)
+import           Control.Monad.ST.Unsafe           (unsafeIOToST)
 import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
 import           Data.STRef.Strict
@@ -116,8 +117,19 @@ luFactor_ a pivots parity = do
         (m, n) = MU.dim a
         n'     = n `div` 2
 
+    unsafeIOToST $ putStrLn "= 1 ================="
+    unsafeIOToST $ putStrLn "luFactor_ called with"
+    mPeek a
+
     if n == 1
-       then pivotAndScale a pivots parity
+       then do
+        pivotAndScale a pivots parity
+        unsafeIOToST $ putStrLn "= 2 ================="
+        unsafeIOToST $ putStrLn "pivotAndScale returned with a = "
+        mPeek a
+        unsafeIOToST $ putStrLn "\nand"
+        vPeek pivots
+
        else do
             let
 
@@ -133,16 +145,76 @@ luFactor_ a pivots parity = do
                pivotsBottom = VU.slice n' (n - n') pivots
 
             luFactor_ aLeft  pivotsTop parity
+
+            unsafeIOToST $ putStrLn "= 3 =================="
+            unsafeIOToST $ putStrLn "luFactor_ returned with aLeft ="
+            mPeek aLeft
+
+            unsafeIOToST $ putStrLn "= 4 =================="
+            unsafeIOToST $ putStrLn "apply pivots"
+            vPeek pivotsTop
+            unsafeIOToST $ putStrLn "\nto aRight"
+            mPeek aRight
+
             rowSwap   aRight pivotsTop
+
+            unsafeIOToST $ putStrLn "= 5 =================="
+            unsafeIOToST $ putStrLn "returned from rowSwap with aRight = "
+            mPeek aRight
+
+            unsafeIOToST $ putStrLn "= 6 =================="
+            unsafeIOToST $ putStrLn "entering triangularSolve with aTopRight"
+            mPeek aTopRight
+            unsafeIOToST $ putStrLn "\nand aTopLeft"
+            mPeek aTopLeft
+
             triangularSolve Lower Unit aTopLeft  aTopRight
+
+            unsafeIOToST $ putStrLn "= 7 =================="
+            unsafeIOToST $ putStrLn "returned from triangularSolve with aTopRight"
+            mPeek aTopRight
+
+            unsafeIOToST $ putStrLn "= 8 =================="
+            unsafeIOToST $ putStrLn "entering matrixMultiply with aBottomRight"
+            mPeek aBottomRight
+            unsafeIOToST $ putStrLn "\nand aBottomLeft"
+            mPeek aBottomLeft
+            unsafeIOToST $ putStrLn "\nand aTopRight"
+            mPeek aTopRight
+
             matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
+
+            unsafeIOToST $ putStrLn "= 9 =================="
+            unsafeIOToST $ putStrLn "returned from matrixMultiply with aBottomRight"
+            mPeek aBottomRight
+
             luFactor_ aBottomRight pivotsBottom parity
+
+            unsafeIOToST $ putStrLn "= 10 ================="
+            unsafeIOToST $ putStrLn "luFactor_ returned with aBottomRight ="
+            mPeek aBottomRight
+
+            unsafeIOToST $ putStrLn "= 11 ================="
+            unsafeIOToST $ putStrLn "apply pivots"
+            vPeek pivotsBottom
+            unsafeIOToST $ putStrLn "\nto aBottomLeft"
+            mPeek aBottomLeft
+
             rowSwap   aBottomLeft  pivotsBottom
+
+            unsafeIOToST $ putStrLn "= 12 ================="
+            unsafeIOToST $ putStrLn "return from rowSwap with aBottomLeft"
+            mPeek aBottomLeft
+            unsafeIOToST $ putStrLn "\nand pivots"
+            vPeek pivotsBottom
 
             -- Add an offset to pivotsBottom it entries refer to the
             -- row number of the original matrix, rather than the
             -- submatrix.
             adjustPivots pivotsBottom n'
+
+            unsafeIOToST $ putStrLn "after shifting"
+            vPeek pivotsBottom
 
 
 -- |  Solve the system of equations AX = B, given A as a packed LU decomposition
@@ -214,7 +286,7 @@ matrixMultiply alpha a b beta c = do
         (rc, cc) = MU.dim c
 
     -- check compatibility of dimensions
-    if ca == rb && rc >= ra && cc >= cb
+    if ca == rb && rc == ra && cc == cb
         then if alpha == 0
                 then if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
@@ -233,10 +305,10 @@ matrixMultiply alpha a b beta c = do
                               MU.write c (i, j) (alpha * aik * bkj)
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                              cij <- MU.read c (i, j)
                               numLoop 0 (ca - 1) $ \k -> do
                                   aik <- MU.read a (i, k)
                                   bkj <- MU.read b (k, j)
+                                  cij <- MU.read c (i, j)
                                   MU.write c (i, j) (alpha * aik * bkj + beta * cij)
         else error "incompatible dimensions"
 
@@ -421,6 +493,28 @@ findPivot m = do
     val <- MU.unsafeRead m (0, 0)
     piv <- go (abs val) 1 0
     return piv
+
+
+mPeek :: MU.MMatrix VU.MVector s Double -> ST s ()
+mPeek a = do
+    let
+        (m, n) = MU.dim a
+    numLoop 0 (m - 1) $ \i -> do
+      unsafeIOToST (putStr "\n")
+      numLoop 0 (n - 1) $ \j -> do
+        aij <- MU.read a (i, j)
+        unsafeIOToST (putStr ((show aij) ++ "  "))
+    unsafeIOToST (putStr "\n")
+
+
+vPeek :: VU.MVector s Int -> ST s ()
+vPeek v = do
+    let
+        n = VU.length v
+    unsafeIOToST (putStr "\n")
+    numLoop 0 (n - 1) $ \i -> do
+        vi <- VU.unsafeRead v i
+        unsafeIOToST (putStrLn (show vi))
 
 
 testMat :: M.Matrix V.Vector Double
