@@ -306,21 +306,25 @@ pivotAndScale a pivots parity = do
     ip   <- findPivot a
     temp <- MU.unsafeRead a (0,  0)
     aip  <- MU.unsafeRead a (ip, 0)
-    MU.unsafeWrite a (0,  0) aip
-    MU.unsafeWrite a (ip, 0) temp
-    VU.unsafeWrite pivots 0 ip
 
-    if ip /= 0
-       then modifySTRef' parity (* (-1))
-       else return ()
+    if aip == 0.0
+       then error "zero pivot in pivotAndScale"
+       else do
+        MU.unsafeWrite a (0,  0) aip
+        MU.unsafeWrite a (ip, 0) temp
+        VU.unsafeWrite pivots 0 ip
 
-    -- Scale the elememts below the first.
-    let
-        (nr, _) = MU.dim a
+        if ip /= 0
+            then modifySTRef' parity (* (-1))
+            else return ()
 
-    numLoop 1 (nr - 1) $ \k -> do
-      ak <- MU.unsafeRead a (k, 0)
-      MU.unsafeWrite a (k, 0) (ak / aip)
+        -- Scale the elememts below the first.
+        let
+            (nr, _) = MU.dim a
+
+        numLoop 1 (nr - 1) $ \k -> do
+            ak <- MU.unsafeRead a (k, 0)
+            MU.unsafeWrite a (k, 0) (ak / aip)
 
 
 -- Given a pivot vector, add a constant to each element.
