@@ -251,7 +251,7 @@ matrixMultiply alpha a b beta c = do
 subMatrix :: (Int, Int)  -- ^ upper left corner of the submatrix
           -> (Int, Int)  -- ^ bottom right corner of the submatrix
           -> MU.MMatrix v s a
-          --> MU.MMatrix v s a
+          -> MU.MMatrix v s a
 {-# INLINE subMatrix #-}
 subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
     | m' <= 0 || n' <= 0 = error "incorrect dimensions in subMatrix"
