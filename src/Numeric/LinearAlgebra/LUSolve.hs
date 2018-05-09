@@ -199,7 +199,9 @@ luSolve_ lu pivots b = do
 --
 -- What is computed (and stored in the matrix c) is
 --
---    alpha * a * b + beta * c,
+--    alpha * a * b + beta * c
+--
+-- so the operation is a matrix 'fused multiply add'.
 --
 matrixMultiply :: Double                          -- alpha
                -> MU.MMatrix VU.MVector s Double  -- matrix a
@@ -248,7 +250,8 @@ matrixMultiply alpha a b beta c = do
 --
 subMatrix :: (Int, Int)  -- ^ upper left corner of the submatrix
           -> (Int, Int)  -- ^ bottom right corner of the submatrix
-          -> MU.MMatrix v s a -> MU.MMatrix v s a
+          -> MU.MMatrix v s a
+          --> MU.MMatrix v s a
 {-# INLINE subMatrix #-}
 subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
     | m' <= 0 || n' <= 0 = error "incorrect dimensions in subMatrix"
