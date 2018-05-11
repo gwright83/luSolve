@@ -28,6 +28,7 @@ module Numeric.LinearAlgebra.LUSolve (
     ) where
 
 import           Control.Loop                      (forLoop, numLoop)
+import           Control.Monad                     (when)
 import           Control.Monad.ST                  (ST, runST)
 import qualified Data.Matrix.Dense.Generic         as M
 import qualified Data.Matrix.Dense.Generic.Mutable as MU
@@ -86,9 +87,7 @@ luFactor aOrig = runST $ do
 
     luFactor_ a' pivots parity
 
-    if m >= n
-       then do return ()
-       else do
+    when (m < n) $ do
         let
             aLeft  = subMatrix (0, 0) (m - 1, m - 1) a
             aRight = subMatrix (0, m) (m - 1, n - 1) a
@@ -317,9 +316,7 @@ pivotAndScale a pivots parity = do
         MU.unsafeWrite a (ip, 0) temp
         VU.unsafeWrite pivots 0 ip
 
-        if ip /= 0
-            then modifySTRef' parity (* (-1))
-            else return ()
+        when (ip /= 0) $ modifySTRef' parity (* (-1))
 
         -- Scale the elememts below the first.
         let
@@ -371,14 +368,10 @@ triangularSolve Lower unit a b = do
     numLoop 0 (n - 1) $ \j ->
       numLoop 0 (m - 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
-        if bkj == 0
-           then return ()
-           else do
-            if unit == NonUnit
-                then do
+        when (bkj /= 0) $ do
+            when (unit == NonUnit) $ do
                 akk <- MU.unsafeRead a (k, k)
                 MU.unsafeWrite b (k, j) (bkj / akk)
-                else return ()
             numLoop (k + 1) (m - 1) $ \i -> do
                 bij  <- MU.unsafeRead b (i, j)
                 aik  <- MU.unsafeRead a (i, k)
@@ -393,14 +386,10 @@ triangularSolve Upper unit a b = do
     numLoop 0 (n - 1) $ \j ->
       forLoop (m - 1) (>= 0) (subtract 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
-        if bkj == 0
-           then return ()
-           else do
-            if unit == NonUnit
-                then do
+        when (bkj /= 0) $ do
+            when (unit == NonUnit) $ do
                 akk <- MU.unsafeRead a (k, k)
                 MU.unsafeWrite b (k, j) (bkj / akk)
-                else return ()
             numLoop 0 (k - 1) $ \i -> do
                 bij  <- MU.unsafeRead b (i, j)
                 aik  <- MU.unsafeRead a (i, k)
