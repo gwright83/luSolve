@@ -65,9 +65,9 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 -- The returned pivot vector is not a permutaion vector, but instead is
 -- in "NAG pivot format".  Reading the vector from top to bottom
 -- (equivalently, frmo left to right), the current entry specifies which
--- row to swap with the current row.  Note that unlike in a permutation vector,
--- where each entry is the index of the nonzero entry of the permutation
--- matrix, a NAG format pivot vector can have repeated entries.
+-- row to swap with the current row.  Note that unlike a permutation vector,
+-- in which each entry is the (unique) index of the nonzero entry of the
+-- permutation matrix, a NAG format pivot vector can have repeated entries.
 --
 luFactor ::  M.Matrix V.Vector Double   -- ^ matrix A
          -> (M.Matrix V.Vector Double,  -- ^ LU decomposition of A
