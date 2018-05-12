@@ -36,7 +36,6 @@ import           Data.STRef.Strict
 import qualified Data.Vector.Unboxed               as V
 import qualified Data.Vector.Unboxed.Mutable       as VU
 
--- tweak
 
 -- | LU Decomposition
 --
@@ -88,7 +87,9 @@ luFactor aOrig = runST $ do
 
     luFactor_ a' pivots parity
 
-    when (m < n) $ do
+    if (m >= n)
+        then return ()
+        else do
         let
             aLeft  = subMatrix (0, 0) (m - 1, m - 1) a
             aRight = subMatrix (0, m) (m - 1, n - 1) a
