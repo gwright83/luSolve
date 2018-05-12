@@ -370,10 +370,14 @@ triangularSolve Lower unit a b = do
     numLoop 0 (n - 1) $ \j ->
       numLoop 0 (m - 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
-        when (bkj /= 0) $ do
-            when (unit == NonUnit) $ do
+        if (bkj == 0)
+           then return ()
+           else do
+            if (unit == NonUnit)
+               then do
                 akk <- MU.unsafeRead a (k, k)
                 MU.unsafeWrite b (k, j) (bkj / akk)
+               else return ()
             numLoop (k + 1) (m - 1) $ \i -> do
                 bij  <- MU.unsafeRead b (i, j)
                 aik  <- MU.unsafeRead a (i, k)
@@ -388,10 +392,14 @@ triangularSolve Upper unit a b = do
     numLoop 0 (n - 1) $ \j ->
       forLoop (m - 1) (>= 0) (subtract 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
-        when (bkj /= 0) $ do
-            when (unit == NonUnit) $ do
+        if (bkj == 0)
+           then return ()
+           else do
+            if (unit == NonUnit)
+               then do
                 akk <- MU.unsafeRead a (k, k)
                 MU.unsafeWrite b (k, j) (bkj / akk)
+               else return ()
             numLoop 0 (k - 1) $ \i -> do
                 bij  <- MU.unsafeRead b (i, j)
                 aik  <- MU.unsafeRead a (i, k)
