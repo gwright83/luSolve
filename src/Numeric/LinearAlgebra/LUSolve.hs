@@ -87,9 +87,7 @@ luFactor aOrig = runST $ do
 
     luFactor_ a' pivots parity
 
-    if (m >= n)
-        then return ()
-        else do
+    when (m < n) $ do
         let
             aLeft  = subMatrix (0, 0) (m - 1, m - 1) a
             aRight = subMatrix (0, m) (m - 1, n - 1) a
@@ -318,7 +316,9 @@ pivotAndScale a pivots parity = do
         MU.unsafeWrite a (ip, 0) temp
         VU.unsafeWrite pivots 0 ip
 
-        when (ip /= 0) $ modifySTRef' parity (* (-1))
+        if (ip /= 0)
+           then modifySTRef' parity (* (-1))
+           else return ()
 
         -- Scale the elememts below the first.
         let
