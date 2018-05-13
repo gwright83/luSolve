@@ -22,7 +22,7 @@ extra-source-files:
 library
   hs-source-dirs:
                  src
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -O2 -fexcess-precision
   build-depends:
                 base >= 4.7 && < 5,
                 loop,
@@ -37,10 +37,9 @@ test-suite luSolve-test
   main-is: Spec.hs
   hs-source-dirs:
                  test
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
   build-depends:
                 base >= 4.7 && < 5,
-                criterion,
                 hspec,
                 luSolve,
                 matrices,
@@ -49,6 +48,14 @@ test-suite luSolve-test
   other-modules:
                 Numeric.LinearAlgebra.LUSolveSpec
   default-language: Haskell2010
+
+benchmark luSolve-bench
+   type: exitcode-stdio-1.0
+   main-is: Bench.hs
+   hs-source-dirs:
+                  benchmark
+   ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
+   default-language: Haskell2010
 
 source-repository head
   type: git
