@@ -2,7 +2,7 @@
 -- Benchmarks for LUSolve.
 --
 
-module HuskBench (
+module LUSolveBenchmark (
     benchmarks
     ) where
 
