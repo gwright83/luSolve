@@ -6,6 +6,7 @@ stages:
   - setup
   - build
   - test
+  - benchmark
 
 setup_job:
   stage: setup
@@ -26,5 +27,12 @@ test_job:
   stage: test
   script:
     - stack test --pedantic
+  tags:
+    - stack-runner
+
+benchmark_job:
+  stage: benchmark
+  script:
+    -stack bench --time-limit 30
   tags:
     - stack-runner
