@@ -10,5 +10,5 @@ import qualified LUSolveBenchmark
 
 main :: IO ()
 main = defaultMain
-    [ bgroup "LUSolve" LUSolveBenchmarks.benchmarks
+    [ bgroup "LUSolve" LUSolveBenchmark.benchmarks
     ]

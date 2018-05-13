@@ -50,12 +50,19 @@ test-suite luSolve-test
   default-language: Haskell2010
 
 benchmark luSolve-bench
-   type: exitcode-stdio-1.0
-   main-is: Bench.hs
-   hs-source-dirs:
-                  benchmark
-   ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
-   default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: Bench.hs
+  hs-source-dirs:
+                 benchmark
+  ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+                base >= 4.7 && < 5,
+                criterion,
+                luSolve,
+                matrices,
+                random,
+                vector
+  default-language: Haskell2010
 
 source-repository head
   type: git
