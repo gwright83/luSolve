@@ -33,6 +33,6 @@ test_job:
 benchmark_job:
   stage: benchmark
   script:
-    - stack bench --benchmark-arguments "--time-limit 30"
+    - stack bench --benchmark-arguments "--time-limit=30"
   tags:
     - stack-runner

@@ -21,7 +21,7 @@ extra-source-files:
 
 library
   hs-source-dirs:
-                 src
+                src
   ghc-options: -Wall -O2 -fexcess-precision
   build-depends:
                 base >= 4.7 && < 5,
@@ -36,7 +36,7 @@ test-suite luSolve-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   hs-source-dirs:
-                 test
+                test
   ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
   build-depends:
                 base >= 4.7 && < 5,
@@ -53,7 +53,7 @@ benchmark luSolve-bench
   type: exitcode-stdio-1.0
   main-is: Bench.hs
   hs-source-dirs:
-                 benchmark
+                benchmark
   ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
   build-depends:
                 base >= 4.7 && < 5,
@@ -62,6 +62,8 @@ benchmark luSolve-bench
                 matrices,
                 random,
                 vector
+  other-modules:
+                LUSolveBenchmark
   default-language: Haskell2010
 
 source-repository head
