@@ -3,7 +3,7 @@
 -- Copyright   : (c) Gregory Wright 2018
 -- License     : BSD-style
 --
--- Maintainer  : Gregory Wright <gwright@antiope.com.
+-- Maintainer  : Gregory Wright <gwright@antiope.com>
 -- Stability   : experimental
 -- Portability : non-portable
 --
@@ -40,39 +40,45 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 -- | LU Decomposition
 --
 -- Factor a rectangular matrix A into PA = LU, where L is lower triangular,
--- U is upper triangular and P is the permuation matrix (represented as
--- a vector containing the location of the nonzero column) that describes
--- the row interchanges (partial pivoting).
+-- U is upper triangular and P is the permuation matrix that gives
+-- the row interchanges (partial pivoting).  Because the permutation matrix
+-- is sparse, it is stored in a special format, described below.
 --
 -- To maintain the expected Haskell API, i.e., an immutable input matrix,
--- the first thing to do is to copy the original immutable
--- matrix into a mutable one.  The LU factorization runs efficiently in place
--- using a mutable matrix. At the end of the calculation, the
--- matrix will be frozen (i.e., made immutable again).
+-- the original immutable matrix is copied into a mutable one.
+-- The LU factorization runs efficiently in place
+-- using a mutable matrix. At the end of the calculation, the mutable
+-- matrix will be frozen (made immutable again).
 --
 -- The factorization takes place in eiher two steps or a single step.
--- If the number of rows of aOrig (m) is less than the number of columns (n),
--- the m * m square matrix is factored first, then the remaining m * (n - m) piece.
--- The the number of rows is greater than or equal to the number of columns,
--- one invocation of luFactor_ is all that is needed.
+-- If the number of rows of A, m, is less than the number of columns, n, then
+-- the m * m square matrix is factored first, followed by the remaining m * (n - m) piece.
+-- If the the number of rows is greater than or equal to the number of columns,
+-- nothing more than a single invocation of luFactor_ is required.
 --
 -- The LU factored matrix is returned in packed format. The upper triangular
 -- part is the U matrix.  The lower triangular part beneath the main diagonal
 -- is the L matrix without its diagonal entries, which are omitted since they
 -- are known to be 1. This is the traditional way of storing the LU decomposition
--- and luSolve understand this format.
+-- and linear system solver luSolve understands this format.
 --
--- The returned pivot vector is not a permutaion vector, but instead is
+-- The returned pivot vector is not a permutation vector, but instead is
 -- in "NAG pivot format".  Reading the vector from top to bottom
 -- (equivalently, from left to right), the current entry specifies which
 -- row to swap with the current row.  Note that unlike a permutation vector,
--- in which each entry is the (unique) index of the nonzero entry of the
--- permutation matrix, a NAG format pivot vector can have repeated entries.
+-- in which each element is the (unique) index of a nonzero entry in the
+-- permutation matrix, a NAG pivot vector can have repeated entries.
 --
-luFactor ::  M.Matrix V.Vector Double   -- ^ matrix A
-         -> (M.Matrix V.Vector Double,  -- ^ LU decomposition of A
-             V.Vector Int,              -- ^ row pivots
-             Int)                       -- ^ parity = (-1)^(number of row interchanges)
+-- The parity, equal to (-1)^(number of row interchanges), is returned.
+-- The determinant of a square input matrix is the product of the diagonal
+-- entries of the packed LU decomposition and the parity.
+--
+luFactor ::  M.Matrix V.Vector Double   -- ^ Matrix A
+         -> (M.Matrix V.Vector Double,
+             V.Vector Int,
+             Int)                       -- ^ (LU Decomposition of A,
+                                        --    row pivots,
+                                        --    parity = (-1)^(number of row interchanges))
 luFactor aOrig = runST $ do
     let
         (m, n) = M.dim aOrig
@@ -102,7 +108,7 @@ luFactor aOrig = runST $ do
     return (aFactored, pivots', parity')
 
 
--- | The luFactor function takes a mutable matrix and replaces
+-- | The luFactor_ function takes a mutable matrix and replaces
 -- it with its LU decomposition.  An unitialized pivot vector
 -- is replaced with the row pivots, in NAG pivot format.
 --
@@ -145,18 +151,21 @@ luFactor_ a pivots parity = do
 
 
 -- |  Solve the system of equations AX = B, given A as a packed LU decomposition
--- and a row permutation vector in NAG pivot format.  Note that X and B are
--- matrices, not vectors.  This allows solving for multiple right hand sides
--- simultanously.
+-- of a  square matrix and a row permutation vector in NAG pivot format.
+-- Note that X and B are matrices, not vectors.  This allows solving for multiple
+-- right hand sides simultanously.
 --
 -- The arguments are structured so one can solve the linear system AX = B
 -- using
 --
---    x = luSolve (luFactor a) b
---
-luSolve :: (M.Matrix V.Vector Double,    -- ^ matrix A, as a packed LU decomposition
-            V.Vector Int,                -- ^ row pivots
-            Int)                         -- ^ parity, ignored here
+-- @
+--   x = luSolve (luFactor a) b
+-- @
+luSolve :: (M.Matrix V.Vector Double,
+            V.Vector Int,
+            Int)                         -- ^ (Matrix A as a packed LU decompostion,
+                                         --    row pivots,
+                                         --    parity (ignored here))
         -> M.Matrix V.Vector Double      -- ^ matrix B
         -> M.Matrix V.Vector Double      -- ^ matrix X
 luSolve (lu, pivots, _) b = runST $ do
