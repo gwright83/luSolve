@@ -411,6 +411,7 @@ triangularSolve Upper unit a b = do
 -- value in the first column.
 --
 findPivot :: MU.MMatrix VU.MVector s Double -> ST s Int
+{-# INLINE findPivot #-}
 findPivot m = do
     let
         (nr, _) = MU.dim m
