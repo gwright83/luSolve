@@ -18,18 +18,23 @@ cabal-version:  >= 1.10
 extra-source-files:
                    ChangeLog.md
                    README.md
+flag documentation
+  default: False
 
 library
   hs-source-dirs:
                 src
   ghc-options: -Wall -O2 -fexcess-precision
+
+  if flag(documentation)
+      build-depends: hscolour
   build-depends:
                 base >= 4.7 && < 5,
                 loop,
                 matrices,
                 vector
   exposed-modules:
-                  Numeric.LinearAlgebra.LUSolve
+                Numeric.LinearAlgebra.LUSolve
   default-language: Haskell2010
 
 test-suite luSolve-test
@@ -47,6 +52,28 @@ test-suite luSolve-test
                 vector
   other-modules:
                 Numeric.LinearAlgebra.LUSolveSpec
+  default-language: Haskell2010
+
+test-suite doctest
+  type:         exitcode-stdio-1.0
+  main-is:      DocTest.hs
+  hs-source-dirs:
+                test
+  build-depends:
+                base,
+                doctest,
+                Glob
+  default-language: Haskell2010
+
+test-suite haddock
+  type:         exitcode-stdio-1.0
+  main-is:      Haddock.hs
+  hs-source-dirs:
+                test
+  build-depends:
+                base,
+                process,
+                regex-compat
   default-language: Haskell2010
 
 benchmark luSolve-bench
