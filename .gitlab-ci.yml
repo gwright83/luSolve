@@ -26,7 +26,7 @@ build_job:
 test_job:
   stage: test
   script:
-    - stack test --pedantic
+    - stack test --pedantic --coverage
   tags:
     - stack-runner
 
