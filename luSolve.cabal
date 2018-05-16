@@ -37,24 +37,27 @@ library
                 Numeric.LinearAlgebra.LUSolve
   default-language: Haskell2010
 
-test-suite luSolve-test
+test-suite luSolve-hspec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   hs-source-dirs:
-                test
-  ghc-options: -Wall -O2 -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
+                test,
+                src
+  ghc-options: -Wall -O2 -fhpc -fexcess-precision -threaded -rtsopts -with-rtsopts=-N
   build-depends:
                 base >= 4.7 && < 5,
                 hspec,
+                loop,
                 luSolve,
                 matrices,
                 random,
                 vector
   other-modules:
+                Numeric.LinearAlgebra.LUSolve,
                 Numeric.LinearAlgebra.LUSolveSpec
   default-language: Haskell2010
 
-test-suite doctest
+test-suite luSolve-doctest
   type:         exitcode-stdio-1.0
   main-is:      DocTest.hs
   hs-source-dirs:
@@ -65,7 +68,7 @@ test-suite doctest
                 Glob
   default-language: Haskell2010
 
-test-suite haddock
+test-suite luSolve-haddock
   type:         exitcode-stdio-1.0
   main-is:      Haddock.hs
   hs-source-dirs:
