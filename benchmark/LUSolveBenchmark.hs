@@ -37,6 +37,7 @@ runLUFactor n = (\(x, _, _) -> x) $ luFactor $ head $ randomSquareMatrices n
 
 benchmarks :: [Benchmark]
 benchmarks =
-    [ bench "luFactor 100 x 100 matrix" $ nf runLUFactor 100
-    , bench "luFactor 500 x 500 matrix" $ nf runLUFactor 500
+    [ bench "luFactor 100 x 100 matrix"   $ nf runLUFactor 100
+    , bench "luFactor 500 x 500 matrix"   $ nf runLUFactor 500
+    , bench "luFactor 1000 x 1000 matrix" $ nf runLUFactor 1000
     ]

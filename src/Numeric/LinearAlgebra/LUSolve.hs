@@ -217,6 +217,7 @@ matrixMultiply :: Double                          -- alpha
                -> Double                          -- beta
                -> MU.MMatrix VU.MVector s Double  -- matrix c, converted to
                -> ST s ()                         -- alpha * (a * b) + beta * c
+{-# INLINE matrixMultiply #-}
 matrixMultiply alpha a b beta c = do
     let
         (ra, ca) = MU.dim a
@@ -243,11 +244,11 @@ matrixMultiply alpha a b beta c = do
                               MU.unsafeWrite c (i, j) (alpha * aik * bkj)
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                              numLoop 0 (ca - 1) $ \k -> do
-                                  aik <- MU.unsafeRead a (i, k)
-                                  bkj <- MU.unsafeRead b (k, j)
-                                  cij <- MU.unsafeRead c (i, j)
-                                  MU.unsafeWrite c (i, j) (alpha * aik * bkj + beta * cij)
+                          numLoop 0 (ca - 1) $ \k -> do
+                              aik <- MU.unsafeRead a (i, k)
+                              bkj <- MU.unsafeRead b (k, j)
+                              cij <- MU.unsafeRead c (i, j)
+                              MU.unsafeWrite c (i, j) (alpha * aik * bkj + beta * cij)
         else error "incompatible dimensions"
 
 
@@ -293,8 +294,8 @@ rowSwap a pivots = do
 
     numLoop 0 (nPivots - 1) $ \i -> do
         ip <- VU.unsafeRead pivots i
-        if ip /= i
-           then numLoop 0 (nc - 1) $ \k -> do
+        when (ip /= i) $
+           numLoop 0 (nc - 1) $ \k -> do
               let
                   i'  = i
                   ip' = ip
@@ -302,7 +303,6 @@ rowSwap a pivots = do
               aipk <- MU.unsafeRead a (ip', k)
               MU.unsafeWrite a (i',  k) aipk
               MU.unsafeWrite a (ip', k) temp
-           else return ()
 
 
 -- pivotAndScale computes the LU decompostion of a matrix
@@ -323,11 +323,9 @@ pivotAndScale a pivots parity = do
        else do
         MU.unsafeWrite a (0,  0) aip
         MU.unsafeWrite a (ip, 0) temp
-        VU.unsafeWrite pivots 0 ip
+        VU.unsafeWrite pivots 0  ip
 
-        if (ip /= 0)
-           then modifySTRef' parity (* (-1))
-           else return ()
+        when (ip /= 0) $ modifySTRef' parity (* (-1))
 
         -- Scale the elememts below the first.
         let
@@ -379,14 +377,10 @@ triangularSolve Lower unit a b = do
     numLoop 0 (n - 1) $ \j ->
       numLoop 0 (m - 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
-        if (bkj == 0)
-           then return ()
-           else do
-            if (unit == NonUnit)
-               then do
+        when (bkj /= 0) $ do
+            when (unit == NonUnit) $ do
                 akk <- MU.unsafeRead a (k, k)
                 MU.unsafeWrite b (k, j) (bkj / akk)
-               else return ()
             numLoop (k + 1) (m - 1) $ \i -> do
                 bij  <- MU.unsafeRead b (i, j)
                 aik  <- MU.unsafeRead a (i, k)
@@ -401,14 +395,10 @@ triangularSolve Upper unit a b = do
     numLoop 0 (n - 1) $ \j ->
       forLoop (m - 1) (>= 0) (subtract 1) $ \k -> do
         bkj <- MU.unsafeRead b (k, j)
-        if (bkj == 0)
-           then return ()
-           else do
-            if (unit == NonUnit)
-               then do
+        when (bkj /= 0) $ do
+            when (unit == NonUnit) $ do
                 akk <- MU.unsafeRead a (k, k)
-                MU.unsafeWrite b (k, j) (bkj / akk)
-               else return ()
+                MU.unsafeWrite b (k, j)  (bkj / akk)
             numLoop 0 (k - 1) $ \i -> do
                 bij  <- MU.unsafeRead b (i, j)
                 aik  <- MU.unsafeRead a (i, k)
