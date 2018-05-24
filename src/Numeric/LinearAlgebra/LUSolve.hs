@@ -217,7 +217,6 @@ matrixMultiply :: Double                          -- alpha
                -> Double                          -- beta
                -> MU.MMatrix VU.MVector s Double  -- matrix c, converted to
                -> ST s ()                         -- alpha * (a * b) + beta * c
-{-# INLINE matrixMultiply #-}
 matrixMultiply alpha a b beta c = do
     let
         (ra, ca) = MU.dim a
