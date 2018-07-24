@@ -13,6 +13,7 @@ cabal-dev
 .dir-locals.el
 *.dyn_o
 *.dyn_hi
+*.dump-simpl
 .hpc
 .hsenv
 .cabal-sandbox/
