@@ -33,6 +33,6 @@ test_job:
 benchmark_job:
   stage: benchmark
   script:
-    - env LANG=C LC_ALL=C stack bench --benchmark-arguments '--time-limit 30'
+    - env LANG=en_US.UTF-8 MM_CHARSET=UTF-8 stack bench --benchmark-arguments '--time-limit 30'
   tags:
     - stack-runner
