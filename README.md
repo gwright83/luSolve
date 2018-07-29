@@ -1,4 +1,3 @@
-[![pipeline status](https://gitlab.18clay.com/software/luSolve/badges/master/pipeline.svg)](https://gitlab.18clay.com/software/luSolve/commits/master)
 
 luSolve
 -------
