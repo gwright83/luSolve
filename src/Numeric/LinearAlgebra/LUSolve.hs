@@ -251,7 +251,7 @@ matrixMultiply alpha a b beta c = do
         else error "incompatible dimensions"
 
 
--- Extract sub matrix
+-- Extract a sub matrix
 --
 -- This is the same as the subMatrix function exported by the
 -- matrices library, but for a mutable matrix.
@@ -272,12 +272,12 @@ subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
 
 -- rowSwap swaps two rows.  Note that the pivot vector is not
 -- arranged as a permutation vector (i.e., the entry at index
--- i corresponding to the row swapped with i), but in NAG pivot
+-- i corresponding to the row swapped with i), but is in NAG pivot
 -- format, in which the i-th entry gives the row number that
 -- was swapped with i when row i was processed).  An easy way
 -- to distinuguish the formats is that in a permutation vector,
--- no entry can be repeated, which in NAG pivot format entries
--- may repeat.
+-- every entry must be unique, which in NAG pivot format entries
+-- may be duplicated.
 --
 -- Note that in either format, an entry which is the same as its
 -- index indicates a row that is not swapped.
@@ -326,7 +326,7 @@ pivotAndScale a pivots parity = do
 
         when (ip /= 0) $ modifySTRef' parity (* (-1))
 
-        -- Scale the elememts below the first.
+        -- Scale the elements below the first.
         let
             (nr, _) = MU.dim a
 
