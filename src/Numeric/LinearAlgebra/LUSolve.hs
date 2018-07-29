@@ -9,14 +9,14 @@
 --
 -- The LUSolve library implements Crout's algorithm for in-place
 -- LU decomposition in pure Haskell.  A function using the
--- LU-factored matrix to solve systems of linear equations is
+-- LU-factored matrix to solve a system of linear equations is
 -- also provided.
 --
 -- The version of Crout's algorithm is that given by F.G. Gustavson,
 -- /IBM Journal of Research and Development/, Vol. 41, No. 6, 1997,
--- pp. 737-755.  This is a recursive, in-place, procedure.  Here
--- it is implemented using a mutable matrix in the ST monad.
--- Partial (row) pivoting is used for numerical stability.
+-- pp. 737-755.  It is a recursive, in-place, procedure.  This
+-- Haskell implementation uses a mutable matrix in the ST monad.
+-- Partial (row) pivoting provides numerical stability.
 --
 
 module Numeric.LinearAlgebra.LUSolve (
@@ -45,33 +45,32 @@ import qualified Data.Vector.Unboxed.Mutable       as VU
 -- is sparse, it is stored in a special format, described below.
 --
 -- To maintain the expected Haskell API, i.e., an immutable input matrix,
--- the original immutable matrix is copied into a mutable one.
--- The LU factorization runs efficiently in place
--- using a mutable matrix. At the end of the calculation, the mutable
--- matrix will be frozen (made immutable again).
+-- the original matrix is copied to a mutable one. LU factorization runs
+-- efficiently in place using a mutable matrix. At the end, the mutable
+-- matrix is frozen (made immutable).
 --
--- The factorization takes place in eiher two steps or a single step.
--- If the number of rows of A, m, is less than the number of columns, n, then
--- the m * m square matrix is factored first, followed by the remaining m * (n - m) piece.
+-- The factorization takes place in either two steps or one. If the number
+-- of rows of A, m, is less than the number of columns, n, the m * m square
+-- matrix is factored first, followed by the remaining m * (n - m) piece.
 -- If the the number of rows is greater than or equal to the number of columns,
--- nothing more than a single invocation of luFactor_ is required.
+-- only a single invocation of luFactor_ is required.
 --
--- The LU factored matrix is returned in packed format. The upper triangular
+-- The LU factored matrix is returned in a packed format. The upper triangular
 -- part is the U matrix.  The lower triangular part beneath the main diagonal
 -- is the L matrix without its diagonal entries, which are omitted since they
 -- are known to be 1. This is the traditional way of storing the LU decomposition
--- and linear system solver luSolve understands this format.
+-- and linear system solver luSolve takes this format as input.
 --
 -- The returned pivot vector is not a permutation vector, but instead is
--- in "NAG pivot format".  Reading the vector from top to bottom
--- (equivalently, from left to right), the current entry specifies which
+-- in "NAG pivot format".  Considering the pivot vector as a column and reading
+-- sequentially from top to bottom, the current entry specifies which
 -- row to swap with the current row.  Note that unlike a permutation vector,
 -- in which each element is the (unique) index of a nonzero entry in the
 -- permutation matrix, a NAG pivot vector can have repeated entries.
 --
--- The parity, equal to (-1)^(number of row interchanges), is returned.
+-- The parity, equal to (-1)^(number of row interchanges), is also returned.
 -- The determinant of a square input matrix is the product of the diagonal
--- entries of the packed LU decomposition and the parity.
+-- entries of its packed LU decomposition and the parity.
 --
 luFactor ::  M.Matrix V.Vector Double   -- ^ Matrix A
          -> (M.Matrix V.Vector Double,
