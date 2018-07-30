@@ -5,8 +5,8 @@
 name:           luSolve
 version:        0.4
 description:    A pure Haskell implementation of LU decomposition and a linear system solver.
-homepage:       https://gitlab.18clay.com/software/luSolve#readme
-bug-reports:    https://gitlab.18clay.com/software/luSolve/issues
+homepage:       https://github.com/gwright83/luSolve#readme
+bug-reports:    https://github.com/gwright83/luSolve/issues
 author:         Gregory Wright
 maintainer:     gwright@antiope.com
 copyright:      2018 Gregory Wright
@@ -70,4 +70,4 @@ benchmark luSolve-bench
 
 source-repository head
   type: git
-  location: https://gitlab.18clay.com/software/luSolve
+  location: https://github.com/gwright83/luSolve
