@@ -124,7 +124,10 @@ luFactor_ a pivots parity = do
        then pivotAndScale a pivots parity
        else do
             let
-
+               -- Partition the original matrix into six
+               -- (not non-overlapping) matrices, in preparation
+               -- for solving the four subproblems of Gustavson's
+               -- method.
                aLeft  = subMatrix (0, 0)  (m - 1, n' - 1) a
                aRight = subMatrix (0, n') (m - 1, n  - 1) a
 
@@ -138,7 +141,7 @@ luFactor_ a pivots parity = do
 
             luFactor_ aLeft  pivotsTop parity
             rowSwap   aRight pivotsTop
-            triangularSolve Lower Unit aTopLeft  aTopRight
+            triangularSolve Lower Unit aTopLeft aTopRight
             matrixMultiply (-1.0) aBottomLeft aTopRight 1.0 aBottomRight
             luFactor_ aBottomRight pivotsBottom parity
             rowSwap   aBottomLeft  pivotsBottom
