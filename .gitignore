@@ -18,7 +18,11 @@ cabal-dev
 .hsenv
 .cabal-sandbox/
 cabal.sandbox.config
-*.prof
+/*.pdf
+/*.png
+/*.prof
+/*.ps
+/*.svg
 *.html
 *.aux
 *.hp
