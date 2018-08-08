@@ -27,7 +27,8 @@ module Numeric.LinearAlgebra.LUSolve (
     luSolve
     ) where
 
-import           Control.Loop                      (forLoop, numLoop)
+import           Control.Loop                      (forLoop, numLoop,
+                                                    numLoopState)
 import           Control.Monad                     (when)
 import           Control.Monad.ST                  (ST, runST)
 import qualified Data.Matrix.Dense.Generic         as M
@@ -233,22 +234,38 @@ matrixMultiply alpha a b beta c = do
                           numLoop 0 (cb - 1) $ \j -> do
                               cij <- MU.unsafeRead c (i, j)
                               MU.unsafeWrite c (i, j) (beta * cij)
-                else if beta == 0
+                else do
+                     if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
-                          numLoop 0 (cb - 1) $ \j ->
-                          numLoop 0 (ca - 1) $ \k -> do
-                              aik <- MU.unsafeRead a (i, k)
-                              bkj <- MU.unsafeRead b (k, j)
-                              MU.unsafeWrite c (i, j) (alpha * aik * bkj)
+                          numLoop 0 (cb - 1) $ \j -> do
+                              s <- numLoopState 0 (ca - 1) 0 $ \s k -> do
+                                  aik <- MU.unsafeRead a (i, k)
+                                  bkj <- MU.unsafeRead b (k, j)
+                                  return $! s + aik * bkj
+                              MU.unsafeWrite c (i, j) (alpha * s)
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                          numLoop 0 (ca - 1) $ \k -> do
-                              aik <- MU.unsafeRead a (i, k)
-                              bkj <- MU.unsafeRead b (k, j)
+                              s <- numLoopState 0 (ca - 1) 0 $ \s k -> do
+                                  aik <- MU.unsafeRead a (i, k)
+                                  bkj <- MU.unsafeRead b (k, j)
+                                  return $! s + aik * bkj
                               cij <- MU.unsafeRead c (i, j)
-                              MU.unsafeWrite c (i, j) (alpha * aik * bkj + beta * cij)
-        else error "incompatible dimensions"
+                              MU.unsafeWrite c (i, j) (alpha * s + beta * cij)
+         else error "incompatible dimensions"
 
+_testMul :: Double
+         -> M.Matrix V.Vector Double
+         -> M.Matrix V.Vector Double
+         -> Double
+         -> M.Matrix V.Vector Double
+         -> M.Matrix V.Vector Double
+_testMul alpha a b beta c = runST $ do
+    a' <- M.thaw a
+    b' <- M.thaw b
+    c' <- M.thaw c
+    matrixMultiply alpha a' b' beta c'
+    c'' <- M.freeze c'
+    return c''
 
 -- Extract a sub matrix
 --
@@ -448,6 +465,15 @@ _testMat'' = M.fromLists [[4.0, 3.0, 1.0, 3.0],
                           [3.0, 5.0, 6.0, 8.0],
                           [1.0, 6.0, 2.0, 7.0],
                           [3.0, 8.0, 7.0, 9.0]]
+
+_testMat3 :: M.Matrix V.Vector Double
+_testMat3 = M.fromLists [[1.0, 2.0], [3.0, 4.0]]
+
+_testMat4 :: M.Matrix V.Vector Double
+_testMat4 = M.fromLists [[5.0], [6.0]]
+
+_testMat5 :: M.Matrix V.Vector Double
+_testMat5 = M.fromLists [[2.0], [1.0]]
 
 _test :: (M.Matrix V.Vector Double, V.Vector Int, Int)
 _test = luFactor _testMat

@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:           luSolve
-version:        0.4
+version:        0.5
 description:    A pure Haskell implementation of LU decomposition and a linear system solver.
 homepage:       https://gitlab.18clay.com/software/luSolve#readme
 bug-reports:    https://gitlab.18clay.com/software/luSolve/issues
@@ -20,24 +20,24 @@ extra-source-files:
                    README.md
 
 flag macportsLLVM
-     description: Use the MacPorts LLVM compiler
-     default: True
+  description: Use the MacPorts LLVM compiler
+  default: True
 
 flag useLLVM
-     description: Build with the -fllvm flag
-     default: True
+  description: Build with the -fllvm flag
+  default: True
 
 library
   hs-source-dirs:
                  src
-  if flag(useLLVM) && flag(macportsLLVM)
-      ghc-options: -Wall -O3 -fexcess-precision
+  if os(darwin) && flag(useLLVM) && flag(macportsLLVM)
+      ghc-options: -Wall -O2 -fexcess-precision
                    -fllvm -pgmlo /opt/local/bin/opt-mp-5.0 -pgmlc /opt/local/bin/llc-mp-5.0
   else
       if flag(useLLVM)
-          ghc-options: -Wall -O3 -fexcess-precision -fllvm
+          ghc-options: -Wall -O2 -fexcess-precision -fllvm
       else
-          ghc-options: -Wall -O3 -fexcess-precision
+          ghc-options: -Wall -O2 -fexcess-precision
   build-depends:
                 base >= 4.7 && < 5,
                 loop,
@@ -53,7 +53,7 @@ test-suite luSolve-hspec
   main-is: Spec.hs
   hs-source-dirs:
                 test
-  ghc-options: -Wall -fexcess-precision
+  ghc-options: -Wall -O2 -fexcess-precision
                -threaded -rtsopts -with-rtsopts=-N
   build-depends:
                 base >= 4.7 && < 5,
@@ -72,7 +72,7 @@ benchmark luSolve-bench
   main-is: Bench.hs
   hs-source-dirs:
                 benchmark
-  ghc-options: -Wall -O3 -fexcess-precision
+  ghc-options: -Wall -O2 -fexcess-precision
                -threaded -rtsopts -with-rtsopts=-N
   build-depends:
                 base >= 4.7 && < 5,
