@@ -27,7 +27,7 @@ module Numeric.LinearAlgebra.LUSolve (
     luSolve
     ) where
 
-import           Control.Loop                      (forLoop, numLoop)
+import           Control.Loop                      (forLoop, numLoop, numLoopState)
 import           Control.Monad                     (when)
 import           Control.Monad.ST                  (ST, runST)
 import qualified Data.Matrix.Dense.Generic         as M
@@ -236,20 +236,23 @@ matrixMultiply alpha a b beta c = do
                           numLoop 0 (cb - 1) $ \j -> do
                               cij <- MU.unsafeRead c (i, j)
                               MU.unsafeWrite c (i, j) (beta * cij)
-                else if beta == 0
+                else do
+                     if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
-                          numLoop 0 (cb - 1) $ \j ->
-                          numLoop 0 (ca - 1) $ \k -> do
-                              aik <- MU.unsafeRead a (i, k)
-                              bkj <- MU.unsafeRead b (k, j)
-                              MU.unsafeWrite c (i, j) (alpha * aik * bkj)
+                          numLoop 0 (cb - 1) $ \j -> do
+                              s <- numLoopState 0 (ca - 1) 0 $ \s k -> do
+                                  aik <- MU.unsafeRead a (i, k)
+                                  bkj <- MU.unsafeRead b (k, j)
+                                  return $! s + aik * bkj
+                              MU.unsafeWrite c (i, j) (alpha * s)
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
-                          numLoop 0 (ca - 1) $ \k -> do
-                              aik <- MU.unsafeRead a (i, k)
-                              bkj <- MU.unsafeRead b (k, j)
+                              s <- numLoopState 0 (ca - 1) 0 $ \s k -> do
+                                  aik <- MU.unsafeRead a (i, k)
+                                  bkj <- MU.unsafeRead b (k, j)
+                                  return $! s + aik * bkj
                               cij <- MU.unsafeRead c (i, j)
-                              MU.unsafeWrite c (i, j) (alpha * aik * bkj + beta * cij)
+                              MU.unsafeWrite c (i, j) (alpha * s + beta * cij)
         else error "incompatible dimensions"
 
 
