@@ -34,10 +34,15 @@ _randomColumnVectors n = Prelude.map (\vs -> M.fromLists (bundle 1 vs )) (bundle
 runLUFactor :: Int -> M.Matrix V.Vector Double
 runLUFactor n = (\(x, _, _) -> x) $ luFactor $ head $ randomSquareMatrices n
 
+genLUFactor ::Int -> M.Matrix V.Vector Double
+genLUFactor n = head $ randomSquareMatrices n
 
 benchmarks :: [Benchmark]
 benchmarks =
-    [ bench "luFactor 100 x 100 matrix"   $ nf runLUFactor 100
+    [ bench "genFactor 100 x 100 matrix"   $ nf genLUFactor 100
+    , bench "luFactor 100 x 100 matrix"   $ nf runLUFactor 100
+    , bench "genFactor 500 x 500 matrix"   $ nf genLUFactor 500
     , bench "luFactor 500 x 500 matrix"   $ nf runLUFactor 500
+    , bench "genFactor 1000 x 1000 matrix" $ nf genLUFactor 1000
     , bench "luFactor 1000 x 1000 matrix" $ nf runLUFactor 1000
     ]
