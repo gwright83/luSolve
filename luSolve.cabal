@@ -34,10 +34,15 @@ library
       ghc-options: -Wall -O2 -fexcess-precision
                    -fllvm -pgmlo /opt/local/bin/opt-mp-5.0 -pgmlc /opt/local/bin/llc-mp-5.0
   else
-      if flag(useLLVM)
-          ghc-options: -Wall -O2 -fexcess-precision -fllvm
-      else
+      if os(freebsd) && flag(useLLVM)
           ghc-options: -Wall -O2 -fexcess-precision
+                        -llvm -pgmlo /usr/local/bin/opt60 -pgmlc /usr/local/bin/llc60
+      else
+          if flag(useLLVM)
+              ghc-options: -Wall -O2 -fexcess-precision -fllvm
+          else
+              ghc-options: -Wall -O2 -fexcess-precision
+
   build-depends:
                 base >= 4.7 && < 5,
                 loop,
