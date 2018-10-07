@@ -36,7 +36,7 @@ library
   else
       if os(freebsd) && flag(useLLVM)
           ghc-options: -Wall -O2 -fexcess-precision
-                        -llvm -pgmlo /usr/local/bin/opt60 -pgmlc /usr/local/bin/llc60
+                        -fllvm -pgmlo /usr/local/bin/opt60 -pgmlc /usr/local/bin/llc60
       else
           if flag(useLLVM)
               ghc-options: -Wall -O2 -fexcess-precision -fllvm
