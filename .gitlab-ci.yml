@@ -19,20 +19,20 @@ setup_job:
 build_job:
   stage: build
   script:
-    - stack build --pedantic
+    - stack build --system-ghc --pedantic
   tags:
     - stack-runner
 
 test_job:
   stage: test
   script:
-    - stack test --pedantic --coverage
+    - stack test --system-ghc --pedantic --coverage
   tags:
     - stack-runner
 
 benchmark_job:
   stage: benchmark
   script:
-    - env LANG=en_US.UTF-8 MM_CHARSET=UTF-8 stack bench --benchmark-arguments '--time-limit 30'
+    - env LANG=en_US.UTF-8 MM_CHARSET=UTF-8 stack bench --system-ghc --benchmark-arguments '--time-limit 30'
   tags:
     - stack-runner
