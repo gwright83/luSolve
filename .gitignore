@@ -29,4 +29,5 @@ cabal.sandbox.config
 .stack-work/
 .DS_Store
 *.dSYM/
+\#*
 *~
