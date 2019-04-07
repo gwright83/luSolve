@@ -144,7 +144,7 @@ luFactor_ a pivots parity = do
             luFactor_ aBottomRight pivotsBottom parity
             rowSwap   aBottomLeft  pivotsBottom
 
-            -- Add an offset to pivotsBottom it entries refer to the
+            -- Add an offset to pivotsBottom so that its entries refer to the
             -- row number of the original matrix, rather than the
             -- submatrix.
             adjustPivots pivotsBottom n'
@@ -295,7 +295,7 @@ subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
 -- every entry must be unique, which in NAG pivot format entries
 -- may be duplicated.
 --
--- Note that in either format, an entry which is the same as its
+-- In either format, an entry which is the same as its
 -- index indicates a row that is not swapped.
 --
 rowSwap :: MU.MMatrix VU.MVector s Double
@@ -352,8 +352,8 @@ pivotAndScale a pivots parity = do
 
 
 -- Given a pivot vector, add a constant to each element.
--- This is used to shift the pivot vector entries from referring
--- to the local submatrix to the global matrix.
+-- This is used to shift the pivot vector entries which refer
+-- to the local submatrix so that they refer to the global matrix.
 --
 adjustPivots :: VU.MVector s Int
              -> Int
