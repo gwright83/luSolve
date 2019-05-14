@@ -19,7 +19,7 @@ setup_job:
 build_job:
   stage: build
   script:
-    - stack build --system-ghc --pedantic
+    - stack build --pedantic
   tags:
     - stack-runner
 
