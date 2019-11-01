@@ -8,7 +8,7 @@ module Numeric.LinearAlgebra.LUSolveSpec where
 
 import           Test.Hspec
 
-import           Data.Matrix.Dense.Generic     as M hiding (zipWith)
+import           Data.Matrix.Generic           as M hiding (zipWith)
 import qualified Data.Vector.Unboxed           as V
 import           Numeric.LinearAlgebra.LUSolve
 import           System.Random

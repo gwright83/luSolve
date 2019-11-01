@@ -46,7 +46,7 @@ library
   build-depends:
                 base >= 4.7 && < 5,
                 loop,
-                matrices,
+                matrices >= 0.5.0,
                 vector
   exposed-modules:
                 Numeric.LinearAlgebra.LUSolve
@@ -65,7 +65,7 @@ test-suite luSolve-hspec
                 hspec,
                 loop,
                 luSolve,
-                matrices,
+                matrices >= 0.5.0,
                 random,
                 vector
   other-modules:
@@ -83,7 +83,7 @@ benchmark luSolve-bench
                 base >= 4.7 && < 5,
                 criterion,
                 luSolve,
-                matrices,
+                matrices >= 0.5.0,
                 random,
                 vector
   other-modules:
