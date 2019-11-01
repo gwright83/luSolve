@@ -31,8 +31,8 @@ import           Control.Loop                      (forLoop, numLoop,
                                                     numLoopState)
 import           Control.Monad                     (when)
 import           Control.Monad.ST                  (ST, runST)
-import qualified Data.Matrix.Dense.Generic         as M
-import qualified Data.Matrix.Dense.Generic.Mutable as MU
+import qualified Data.Matrix.Generic               as M
+import qualified Data.Matrix.Generic.Mutable       as MU
 import           Data.STRef.Strict
 import qualified Data.Vector.Unboxed               as V
 import qualified Data.Vector.Unboxed.Mutable       as VU
