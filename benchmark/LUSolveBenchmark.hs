@@ -11,7 +11,7 @@ import           Criterion                     (Benchmark, bench, bgroup, env,
 
 import           Numeric.LinearAlgebra.LUSolve (luFactor)
 
-import qualified Data.Matrix.Dense.Generic     as M
+import qualified Data.Matrix.Generic           as M
 import qualified Data.Vector.Unboxed           as V
 import           System.Random
 
