@@ -14,7 +14,7 @@
 --
 -- The version of Crout's algorithm is that given by F.G. Gustavson,
 -- /IBM Journal of Research and Development/, Vol. 41, No. 6, 1997,
--- pp. 737-755.  It is a recursive, in-place, procedure.  This
+-- pp. 737-755.  It is a recursive, in-place procedure.  This
 -- Haskell implementation uses a mutable matrix in the ST monad.
 -- Partial (row) pivoting provides numerical stability.
 --
@@ -27,15 +27,14 @@ module Numeric.LinearAlgebra.LUSolve (
     luSolve
     ) where
 
-import           Control.Loop                      (forLoop, numLoop,
-                                                    numLoopState)
-import           Control.Monad                     (when)
-import           Control.Monad.ST                  (ST, runST)
-import qualified Data.Matrix.Generic               as M
-import qualified Data.Matrix.Generic.Mutable       as MU
+import           Control.Loop                (forLoop, numLoop, numLoopState)
+import           Control.Monad               (when)
+import           Control.Monad.ST            (ST, runST)
+import qualified Data.Matrix.Generic         as M
+import qualified Data.Matrix.Generic.Mutable as MU
 import           Data.STRef.Strict
-import qualified Data.Vector.Unboxed               as V
-import qualified Data.Vector.Unboxed.Mutable       as VU
+import qualified Data.Vector.Unboxed         as V
+import qualified Data.Vector.Unboxed.Mutable as VU
 
 
 -- | LU Decomposition
@@ -181,8 +180,7 @@ luSolve (lu, pivots, _) b = runST $ do
         then error "incompatible dimensions in luSolve_"
         else luSolve_ lu pivots x
 
-    x' <- M.unsafeFreeze x
-    return x'
+    M.unsafeFreeze x
 
 
 -- | luSolve_ does the work of solving the system of linear equations Ax = b.
@@ -228,7 +226,7 @@ matrixMultiply alpha a b beta c = do
         then if alpha == 0
                 then if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
-                          numLoop 0 (cb - 1) $ \j -> do
+                          numLoop 0 (cb - 1) $ \j ->
                               MU.unsafeWrite c (i, j) 0
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
@@ -264,8 +262,8 @@ _testMul alpha a b beta c = runST $ do
     b' <- M.thaw b
     c' <- M.thaw c
     matrixMultiply alpha a' b' beta c'
-    c'' <- M.freeze c'
-    return c''
+    M.freeze c'
+
 
 -- Extract a sub matrix
 --
@@ -353,17 +351,15 @@ pivotAndScale a pivots parity = do
 
 -- Given a pivot vector, add a constant to each element.
 -- This is used to shift the pivot vector entries which refer
--- to the local submatrix so that they refer to the global matrix.
+-- to the row numbers of the local submatrix so that they refer
+-- the same in the global matrix.
 --
 adjustPivots :: VU.MVector s Int
              -> Int
              -> ST s ()
 {-# INLINE adjustPivots #-}
 adjustPivots pivots offset = do
-    let
-        nPivots = VU.length pivots
-
-    numLoop 0 (nPivots - 1) $ \i -> do
+    numLoop 0 (VU.length pivots - 1) $ \i -> do
         ip <- VU.unsafeRead pivots i
         VU.unsafeWrite pivots i (ip + offset)
 
