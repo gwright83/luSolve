@@ -251,6 +251,7 @@ matrixMultiply alpha a b beta c = do
                               MU.unsafeWrite c (i, j) (alpha * s + beta * cij)
          else error "incompatible dimensions"
 
+
 _testMul :: Double
          -> M.Matrix V.Vector Double
          -> M.Matrix V.Vector Double
