@@ -1,5 +1,3 @@
-[![pipeline status](https://gitlab.18clay.com/software/luSolve/badges/streamlined/pipeline.svg)](https://gitlab.18clay.com/software/luSolve/commits/streamlined)
-
 luSolve
 -------
 
@@ -11,3 +9,7 @@ The algorithm used is Gustavson's recursive LU decomposition, see
 **Gustavson, F.G., "Recursion leads to automatic variable blocking for
 dense linear algebra algorithms," IBM J. Res. Dev., 41, pp. 737-756 (1997).**
 
+To see something happen, type
+```
+    $ stack test
+```
