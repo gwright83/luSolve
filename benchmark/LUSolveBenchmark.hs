@@ -6,11 +6,12 @@ module LUSolveBenchmark (
     benchmarks
     ) where
 
-import           Criterion                     (Benchmark, bench, nf)
+import           Criterion                     (Benchmark, bench, bgroup, env,
+                                                nf)
 
 import           Numeric.LinearAlgebra.LUSolve (luFactor)
 
-import qualified Data.Matrix.Dense.Generic     as M
+import qualified Data.Matrix.Generic           as M
 import qualified Data.Vector.Unboxed           as V
 import           System.Random
 
@@ -18,26 +19,25 @@ bundle :: Int -> [ a ] -> [[ a ]]
 bundle _ [] = []
 bundle n xs = take n xs : bundle n (drop n xs)
 
-mVals :: [ Double ]
-mVals = randoms (mkStdGen 1)
+type Mat = M.Matrix V.Vector Double
 
+runLUFactor :: Mat -> Mat
+runLUFactor = (\(x, _, _) -> x) . luFactor
 
-randomSquareMatrices :: Int -> [ M.Matrix V.Vector Double ]
-randomSquareMatrices n = Prelude.map (\vs -> M.fromLists (bundle n vs)) (bundle (n * n) mVals)
+setupEnv :: IO (Mat, Mat, Mat)
+setupEnv = do
+  let mVals = randoms (mkStdGen 1) -- not a top level CAF, so will be GC'd promptly
+      randomSquareMatrices :: Int -> [ Mat ]
+      randomSquareMatrices n = Prelude.map (\vs -> M.fromLists (bundle n vs)) (bundle (n * n) mVals)
+      m100:_ = randomSquareMatrices 100
+      m500:_ = randomSquareMatrices 500
+      m1000:_= randomSquareMatrices 1000
+  return (m100, m500, m1000)
 
-_vVals :: [ Double ]
-_vVals = randoms (mkStdGen 2)
-
-_randomColumnVectors :: Int -> [ M.Matrix V.Vector Double ]
-_randomColumnVectors n = Prelude.map (\vs -> M.fromLists (bundle 1 vs )) (bundle n _vVals)
-
-runLUFactor :: Int -> M.Matrix V.Vector Double
-runLUFactor n = (\(x, _, _) -> x) $ luFactor $ head $ randomSquareMatrices n
-
-
-benchmarks :: [Benchmark]
-benchmarks =
-    [ bench "luFactor 100 x 100 matrix"   $ nf runLUFactor 100
-    , bench "luFactor 500 x 500 matrix"   $ nf runLUFactor 500
-    , bench "luFactor 1000 x 1000 matrix" $ nf runLUFactor 1000
+benchmarks :: Benchmark
+benchmarks = env setupEnv $ \ ~(m100, m500, m1000) ->
+  bgroup "luFactor"
+    [ bench "100 x 100"   $ nf runLUFactor m100
+    , bench "500 x 500"   $ nf runLUFactor m500
+    , bench "1000 x 1000" $ nf runLUFactor m1000
     ]

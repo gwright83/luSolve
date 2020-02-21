@@ -6,6 +6,7 @@
 
 dist
 cabal-dev
+stack.yaml.lock
 *.o
 *.hi
 *.chi
@@ -18,11 +19,16 @@ cabal-dev
 .hsenv
 .cabal-sandbox/
 cabal.sandbox.config
-*.prof
+/*.pdf
+/*.png
+/*.prof
+/*.ps
+/*.svg
 *.html
 *.aux
 *.hp
 .stack-work/
 .DS_Store
 *.dSYM/
+\#*
 *~

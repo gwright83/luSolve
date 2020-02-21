@@ -14,7 +14,7 @@
 --
 -- The version of Crout's algorithm is that given by F.G. Gustavson,
 -- /IBM Journal of Research and Development/, Vol. 41, No. 6, 1997,
--- pp. 737-755.  It is a recursive, in-place, procedure.  This
+-- pp. 737-755.  It is a recursive, in-place procedure.  This
 -- Haskell implementation uses a mutable matrix in the ST monad.
 -- Partial (row) pivoting provides numerical stability.
 --
@@ -27,14 +27,14 @@ module Numeric.LinearAlgebra.LUSolve (
     luSolve
     ) where
 
-import           Control.Loop                      (forLoop, numLoop, numLoopState)
-import           Control.Monad                     (when)
-import           Control.Monad.ST                  (ST, runST)
-import qualified Data.Matrix.Dense.Generic         as M
-import qualified Data.Matrix.Dense.Generic.Mutable as MU
+import           Control.Loop                (forLoop, numLoop, numLoopState)
+import           Control.Monad               (when)
+import           Control.Monad.ST            (ST, runST)
+import qualified Data.Matrix.Generic         as M
+import qualified Data.Matrix.Generic.Mutable as MU
 import           Data.STRef.Strict
-import qualified Data.Vector.Unboxed               as V
-import qualified Data.Vector.Unboxed.Mutable       as VU
+import qualified Data.Vector.Unboxed         as V
+import qualified Data.Vector.Unboxed.Mutable as VU
 
 
 -- | LU Decomposition
@@ -146,7 +146,7 @@ luFactor_ a pivots parity = do
             luFactor_ aBottomRight pivotsBottom parity
             rowSwap   aBottomLeft  pivotsBottom
 
-            -- Add an offset to pivotsBottom it entries refer to the
+            -- Add an offset to pivotsBottom so that its entries refer to the
             -- row number of the original matrix, rather than the
             -- submatrix.
             adjustPivots pivotsBottom n'
@@ -183,8 +183,7 @@ luSolve (lu, pivots, _) b = runST $ do
         then error "incompatible dimensions in luSolve_"
         else luSolve_ lu pivots x
 
-    x' <- M.unsafeFreeze x
-    return x'
+    M.unsafeFreeze x
 
 
 -- | luSolve_ does the work of solving the system of linear equations Ax = b.
@@ -230,7 +229,7 @@ matrixMultiply alpha a b beta c = do
         then if alpha == 0
                 then if beta == 0
                      then numLoop 0 (ra - 1) $ \i ->
-                          numLoop 0 (cb - 1) $ \j -> do
+                          numLoop 0 (cb - 1) $ \j ->
                               MU.unsafeWrite c (i, j) 0
                      else numLoop 0 (ra - 1) $ \i ->
                           numLoop 0 (cb - 1) $ \j -> do
@@ -253,7 +252,21 @@ matrixMultiply alpha a b beta c = do
                                   return $! s + aik * bkj
                               cij <- MU.unsafeRead c (i, j)
                               MU.unsafeWrite c (i, j) (alpha * s + beta * cij)
-        else error "incompatible dimensions"
+         else error "incompatible dimensions"
+
+
+_testMul :: Double
+         -> M.Matrix V.Vector Double
+         -> M.Matrix V.Vector Double
+         -> Double
+         -> M.Matrix V.Vector Double
+         -> M.Matrix V.Vector Double
+_testMul alpha a b beta c = runST $ do
+    a' <- M.thaw a
+    b' <- M.thaw b
+    c' <- M.thaw c
+    matrixMultiply alpha a' b' beta c'
+    M.freeze c'
 
 
 -- Extract a sub matrix
@@ -284,7 +297,7 @@ subMatrix (i,j) (i',j') (MU.MMatrix _ _ tda offset vec)
 -- every entry must be unique, which in NAG pivot format entries
 -- may be duplicated.
 --
--- Note that in either format, an entry which is the same as its
+-- In either format, an entry which is the same as its
 -- index indicates a row that is not swapped.
 --
 rowSwap :: MU.MMatrix VU.MVector s Double
@@ -341,18 +354,16 @@ pivotAndScale a pivots parity = do
 
 
 -- Given a pivot vector, add a constant to each element.
--- This is used to shift the pivot vector entries from referring
--- to the local submatrix to the global matrix.
+-- This is used to shift the pivot vector entries which refer
+-- to the row numbers of the local submatrix so that they refer
+-- the same in the global matrix.
 --
 adjustPivots :: VU.MVector s Int
              -> Int
              -> ST s ()
 {-# INLINE adjustPivots #-}
 adjustPivots pivots offset = do
-    let
-        nPivots = VU.length pivots
-
-    numLoop 0 (nPivots - 1) $ \i -> do
+    numLoop 0 (VU.length pivots - 1) $ \i -> do
         ip <- VU.unsafeRead pivots i
         VU.unsafeWrite pivots i (ip + offset)
 
@@ -454,6 +465,15 @@ _testMat'' = M.fromLists [[4.0, 3.0, 1.0, 3.0],
                           [3.0, 5.0, 6.0, 8.0],
                           [1.0, 6.0, 2.0, 7.0],
                           [3.0, 8.0, 7.0, 9.0]]
+
+_testMat3 :: M.Matrix V.Vector Double
+_testMat3 = M.fromLists [[1.0, 2.0], [3.0, 4.0]]
+
+_testMat4 :: M.Matrix V.Vector Double
+_testMat4 = M.fromLists [[5.0], [6.0]]
+
+_testMat5 :: M.Matrix V.Vector Double
+_testMat5 = M.fromLists [[2.0], [1.0]]
 
 _test :: (M.Matrix V.Vector Double, V.Vector Int, Int)
 _test = luFactor _testMat
