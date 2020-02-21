@@ -1,6 +1,6 @@
 -- |
 -- Module      : Numeric.LinearAlgebra.LUSolve
--- Copyright   : (c) Gregory Wright 2018
+-- Copyright   : (c) Gregory Wright 2018, 2020
 -- License     : BSD-style
 --
 -- Maintainer  : Gregory Wright <gwright@antiope.com>
